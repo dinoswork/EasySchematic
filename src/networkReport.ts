@@ -1,7 +1,7 @@
 import type { SchematicNode, DeviceData, ConnectionEdge } from "./types";
-import { SIGNAL_LABELS } from "./types";
+import { SIGNAL_GROUPS, SIGNAL_LABELS } from "./types";
 import { NETWORK_SIGNAL_TYPES } from "./connectorTypes";
-import { findReachableDhcpServers } from "./networkValidation";
+import { collapseStubEdges, findReachableDhcpServers } from "./networkValidation";
 import { getRoomLabel, escapeCsv } from "./packList";
 import { findPortByHandle } from "./portHandles";
 import { transformLabelNow } from "./labelCaseUtils";
@@ -155,47 +155,88 @@ export interface PoeBudgetRow {
   overBudget: boolean;
 }
 
+const POWER_SIGNALS = new Set<string>(SIGNAL_GROUPS.Power);
+
 /**
- * Compute PoE budget summary for switches: walks edges from each switch that has
- * poeBudgetW set, sums poeDrawW from directly connected device ports.
+ * Compute the PoE budget summary for every PoE source (a device with poeBudgetW set).
+ *
+ * LOAD counts each powered device once, in one place (#252; the no-double-count rule of #404):
+ * - A per-port "PoE (W)" figure wins. Every powered port that connects to the source adds
+ *   its own draw, and the device-level figure is then ignored.
+ * - The device-level "Powered by PoE" figure is the fallback for a device none of whose
+ *   ports carry a figure. It is charged to exactly one PoE source. A source that is itself
+ *   mains-powered (no PoE draw of its own) is preferred, so a PoE-powered switch bills its
+ *   upstream switch, not its downstream one; connection order breaks remaining ties.
+ * - The fallback is skipped when the device has a connected power input (e.g. a camera
+ *   whose DC barrel is wired to a PSU) — it isn't drawing from PoE.
+ *
+ * Stubbed connections are collapsed back to their real device endpoints first, so a
+ * stubbed PoE run still lands on its switch.
  */
 export function computePoeBudget(nodes: SchematicNode[], edges: ConnectionEdge[]): PoeBudgetRow[] {
-  const rows: PoeBudgetRow[] = [];
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const deviceData = (id: string): DeviceData | undefined => {
+    const n = nodeMap.get(id);
+    return n?.type === "device" ? (n.data as DeviceData) : undefined;
+  };
+  const isPoeSource = (id: string) => !!deviceData(id)?.poeBudgetW;
+  const logical = collapseStubEdges(nodes, edges);
 
+  // Devices with a power input that is actually wired to something.
+  const mainsPowered = new Set<string>();
+  for (const edge of logical) {
+    for (const [id, handle] of [[edge.source, edge.sourceHandle], [edge.target, edge.targetHandle]] as const) {
+      const data = deviceData(id);
+      if (!data || !handle) continue;
+      const port = findPortByHandle(data, handle);
+      if (port && POWER_SIGNALS.has(port.signalType) && port.direction !== "output") mainsPowered.add(id);
+    }
+  }
+
+  const loadBySource = new Map<string, number>();
+  const addLoad = (sourceId: string, w: number) =>
+    loadBySource.set(sourceId, (loadBySource.get(sourceId) ?? 0) + w);
+  // Candidate PoE sources (in connection order) for each device-level-powered device.
+  const deviceDrawCandidates = new Map<string, string[]>();
+
+  for (const edge of logical) {
+    if (!NETWORK_SIGNAL_TYPES.has(edge.signalType)) continue;
+    // Each end is a candidate powered device when the other end is a PoE source.
+    const ends: [string, string | null | undefined, string][] = [
+      [edge.target, edge.targetHandle, edge.source],
+      [edge.source, edge.sourceHandle, edge.target],
+    ];
+    for (const [poweredId, poweredHandle, sourceId] of ends) {
+      if (!isPoeSource(sourceId)) continue;
+      const powered = deviceData(poweredId);
+      if (!powered || !poweredHandle) continue;
+
+      if (powered.ports.some((p) => p.poeDrawW)) {
+        const port = findPortByHandle(powered, poweredHandle);
+        if (port?.poeDrawW) addLoad(sourceId, port.poeDrawW);
+      } else if (powered.poeDrawW && !mainsPowered.has(poweredId)) {
+        const list = deviceDrawCandidates.get(poweredId) ?? [];
+        if (!list.includes(sourceId)) list.push(sourceId);
+        deviceDrawCandidates.set(poweredId, list);
+      }
+    }
+  }
+
+  for (const [poweredId, candidates] of deviceDrawCandidates) {
+    const chosen = candidates.find((id) => !deviceData(id)?.poeDrawW || mainsPowered.has(id)) ?? candidates[0];
+    addLoad(chosen, deviceData(poweredId)!.poeDrawW!);
+  }
+
+  const rows: PoeBudgetRow[] = [];
   for (const node of nodes) {
     if (node.type !== "device") continue;
     const data = node.data as DeviceData;
     if (!data.poeBudgetW) continue;
-
-    const room = getRoomLabel(nodes, node.parentId);
-    let loadW = 0;
-
-    // Sum poeDrawW from ports of devices connected to this switch
-    for (const edge of edges) {
-      if (!edge.data || !NETWORK_SIGNAL_TYPES.has(edge.data.signalType)) continue;
-      let connectedNodeId: string | undefined;
-      let connectedHandle: string | null | undefined;
-      if (edge.source === node.id) {
-        connectedNodeId = edge.target;
-        connectedHandle = edge.targetHandle;
-      } else if (edge.target === node.id) {
-        connectedNodeId = edge.source;
-        connectedHandle = edge.sourceHandle;
-      }
-      if (!connectedNodeId || !connectedHandle) continue;
-
-      const connectedNode = nodeMap.get(connectedNodeId);
-      if (!connectedNode || connectedNode.type !== "device") continue;
-      const connData = connectedNode.data as DeviceData;
-      const port = findPortByHandle(connData, connectedHandle);
-      if (port?.poeDrawW) loadW += port.poeDrawW;
-    }
-
+    const loadW = loadBySource.get(node.id) ?? 0;
     rows.push({
       nodeId: node.id,
       deviceLabel: transformLabelNow(data.label),
-      room,
+      room: getRoomLabel(nodes, node.parentId),
       budgetW: data.poeBudgetW,
       loadW,
       remainingW: data.poeBudgetW - loadW,

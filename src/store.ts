@@ -2010,10 +2010,19 @@ function templateKey(t: DeviceTemplate): string {
 }
 
 function loadCustomTemplates(): DeviceTemplate[] {
+  return readStoredCustomTemplates() ?? [];
+}
+
+/**
+ * The stored custom template list, or null when nothing has ever been saved (or storage is
+ * unreadable). A stored "[]" — a library the user cleared — is a real, empty list (#251).
+ */
+function readStoredCustomTemplates(): DeviceTemplate[] | null {
   try {
     const raw = localStorage.getItem(TEMPLATES_KEY);
-    if (!raw) return [];
+    if (raw == null) return null;
     const templates = JSON.parse(raw) as DeviceTemplate[];
+    if (!Array.isArray(templates)) return null;
     // Migrate legacy custom templates: move unique key from deviceType to id
     for (const t of templates) {
       if (!t.id && t.deviceType.startsWith("custom-")) {
@@ -2022,7 +2031,7 @@ function loadCustomTemplates(): DeviceTemplate[] {
     }
     return templates;
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -2032,6 +2041,27 @@ function saveCustomTemplates(templates: DeviceTemplate[]) {
   } catch {
     // silently fail
   }
+}
+
+/**
+ * The custom template list to mutate. Every tab of the app (and the installed app) shares one
+ * localStorage but keeps its own in-memory copy, so a tab that missed another tab's writes
+ * would otherwise save its stale list back over them — wiping devices imported elsewhere, or
+ * resurrecting ones deleted or cleared there (#251). Whatever is stored is the truth; memory
+ * is used only when nothing has been stored yet or storage can't be read.
+ */
+function withStoredCustomTemplates(inMemory: DeviceTemplate[]): DeviceTemplate[] {
+  return readStoredCustomTemplates() ?? inMemory;
+}
+
+/** Same idea for the library order list (#251). */
+function withStoredCustomTemplateOrder(inMemory: string[]): string[] {
+  try {
+    const raw = localStorage.getItem(TEMPLATE_META_KEY);
+    const order = raw ? (JSON.parse(raw) as CustomTemplateMeta).order : undefined;
+    if (Array.isArray(order)) return order;
+  } catch { /* use memory */ }
+  return inMemory;
 }
 
 function loadCustomTemplateMeta(templates: DeviceTemplate[]): CustomTemplateMeta {
@@ -4289,15 +4319,15 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   },
 
   addCustomTemplate: (template) => {
-    const updated = [...get().customTemplates, template];
-    const order = [...get().customTemplateOrder, templateKey(template)];
+    const updated = [...withStoredCustomTemplates(get().customTemplates), template];
+    const order = [...withStoredCustomTemplateOrder(get().customTemplateOrder), templateKey(template)];
     set({ customTemplates: updated, customTemplateOrder: order });
     saveCustomTemplates(updated);
     saveCustomTemplateMeta({ groups: get().customTemplateGroups, order, groupAssignments: get().customTemplateGroupAssignments });
   },
 
   updateCustomTemplate: (id, template) => {
-    const updated = get().customTemplates.map((t) => (t.id === id ? template : t));
+    const updated = withStoredCustomTemplates(get().customTemplates).map((t) => (t.id === id ? template : t));
     set({ customTemplates: updated });
     saveCustomTemplates(updated);
   },
@@ -4367,8 +4397,8 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   },
 
   removeCustomTemplate: (key) => {
-    const updated = get().customTemplates.filter((t) => templateKey(t) !== key);
-    const order = get().customTemplateOrder.filter((k) => k !== key);
+    const updated = withStoredCustomTemplates(get().customTemplates).filter((t) => templateKey(t) !== key);
+    const order = withStoredCustomTemplateOrder(get().customTemplateOrder).filter((k) => k !== key);
     const { [key]: _, ...groupAssignments } = get().customTemplateGroupAssignments;
     set({ customTemplates: updated, customTemplateOrder: order, customTemplateGroupAssignments: groupAssignments });
     saveCustomTemplates(updated);
@@ -5479,12 +5509,12 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   },
 
   importCustomTemplates: (templates) => {
-    const existing = get().customTemplates;
+    const existing = withStoredCustomTemplates(get().customTemplates);
     const existingKeys = new Set(existing.map((t) => templateKey(t)));
     const newTemplates = templates.filter((t) => !existingKeys.has(templateKey(t)));
     if (newTemplates.length > 0) {
       const merged = [...existing, ...newTemplates];
-      const order = [...get().customTemplateOrder, ...newTemplates.map((t) => templateKey(t))];
+      const order = [...withStoredCustomTemplateOrder(get().customTemplateOrder), ...newTemplates.map((t) => templateKey(t))];
       set({ customTemplates: merged, customTemplateOrder: order });
       saveCustomTemplates(merged);
       saveCustomTemplateMeta({ groups: get().customTemplateGroups, order, groupAssignments: get().customTemplateGroupAssignments });
@@ -6629,7 +6659,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
     nodes = reconcileBundleJunctions(nodes, edges);
     // Merge imported custom templates with existing ones (avoid duplicates by template key)
     if (data.customTemplates?.length) {
-      const existing = get().customTemplates;
+      const existing = withStoredCustomTemplates(get().customTemplates);
       const existingKeys = new Set(existing.map((t) => templateKey(t)));
       const newTemplates = data.customTemplates.filter((t) => !existingKeys.has(templateKey(t)));
       if (newTemplates.length > 0) {
@@ -7953,3 +7983,27 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
     set({ resizeGuides: guides });
   },
 }));
+
+/** Re-read the custom device library (templates + groups/order) from localStorage. */
+export function reloadCustomTemplatesFromStorage(): void {
+  const customTemplates = loadCustomTemplates();
+  const meta = loadCustomTemplateMeta(customTemplates);
+  useSchematicStore.setState({
+    customTemplates,
+    customTemplateGroups: meta.groups,
+    customTemplateOrder: meta.order,
+    customTemplateGroupAssignments: meta.groupAssignments,
+  });
+}
+
+// Keep every open tab's device library in step with the shared localStorage (#251). The
+// "storage" event fires in the OTHER tabs of this origin whenever one tab writes a key. A
+// page restored from the back/forward cache missed any events while frozen, so it re-reads.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (e) => {
+    if (e.key === TEMPLATES_KEY || e.key === TEMPLATE_META_KEY) reloadCustomTemplatesFromStorage();
+  });
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) reloadCustomTemplatesFromStorage();
+  });
+}

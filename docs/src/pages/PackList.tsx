@@ -113,6 +113,30 @@ export default function PackListPage() {
         <li><strong>VLAN</strong>, <strong>DHCP status</strong>, and <strong>DHCP server</strong> — shows which DHCP server covers each port</li>
         <li><strong>Link speed</strong> and <strong>PoE draw</strong></li>
       </ul>
+      <h3>PoE budget</h3>
+      <p>
+        Any device with a <strong>PoE Source</strong> budget gets a row in the PoE budget summary,
+        showing its budget, the load connected to it, and what remains. A powered device's draw
+        can be entered in two places, and it is only ever counted once:
+      </p>
+      <ul>
+        <li>
+          <strong>Per-port PoE draw</strong> — the PoE (W) field on a network port. If any port on
+          a device has one, only those port figures count, each against the PoE source its
+          connection lands on.
+        </li>
+        <li>
+          <strong>Powered by PoE</strong> — the device-level draw in the device editor. It is used
+          only when none of the device's ports has a PoE figure, and it is charged to a single
+          PoE source. When a device is cabled to more than one, a source that isn't itself PoE
+          powered is preferred, so a PoE-powered switch counts against the switch feeding it.
+        </li>
+      </ul>
+      <p>
+        A device whose power input port is connected to a power supply isn't counted against
+        any PoE budget through its device-level draw, since it isn't drawing from PoE. Stubbed
+        connections count the same as drawn ones.
+      </p>
       <p>
         This is useful for generating IP address schedules and verifying network configuration
         before a show. The network report supports the same PDF export, CSV export, and print
