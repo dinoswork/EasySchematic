@@ -417,7 +417,7 @@ export default function ConnectionsPage() {
 
       <h3>Customizing stub labels</h3>
       <p>
-        Three options in <strong>Preferences → Display → Stub labels</strong> control what appears on stub labels
+        These options in <strong>Preferences → Display → Stub labels</strong> control what appears on stub labels
         across the whole schematic:
       </p>
       <ul>
@@ -432,6 +432,12 @@ export default function ConnectionsPage() {
           same signal type.
         </li>
         <li>
+          <strong>Show room name on stub labels</strong> — adds the destination room in parentheses, e.g.{" "}
+          <code>Projector (Main Hall)</code>. The room only appears when the far device is in a{" "}
+          <em>different</em> room from the device at the stub's own end. A stub between two devices in the same
+          room leaves the room off, since it tells the reader nothing.
+        </li>
+        <li>
           <strong>Page number on stub labels</strong> — choose <em>Cross-page only</em> (default), <em>Always</em>,
           or <em>Never</em>. Cross-page only suppresses the <code>Pg N</code> tag when both ends of a stub
           happen to land on the same printed page, which is usually noise.
@@ -439,9 +445,10 @@ export default function ConnectionsPage() {
       </ul>
       <p>
         All of these can also be overridden on a single stub. Right-click the <strong>stub label</strong> itself
-        and use <strong>Show arrow</strong>, <strong>Show port</strong> or <strong>Page mode</strong> — each cycles
-        through <em>Default</em> (use the global setting) and explicit values, so an individual stub can opt in or
-        out independently.
+        and use <strong>Show arrow</strong>, <strong>Show port</strong>, <strong>Show room</strong> or{" "}
+        <strong>Page mode</strong> — each cycles through <em>Default</em> (use the global setting) and explicit
+        values, so an individual stub can opt in or out independently. Setting <strong>Show room</strong> to{" "}
+        <em>On</em> on a single stub shows the room even when both devices share it.
       </p>
 
       <h3>Cable-ID-only tags</h3>
@@ -453,9 +460,15 @@ export default function ConnectionsPage() {
         <em>Destination</em> to get them back.
       </p>
       <p>
-        The setting is per stub label, so one end of a connection can be a cable tag while the other still names
-        its destination. It applies to the canvas, PDF export and DXF export alike. A connection with no cable ID
-        — a direct-attach one, for instance — shows a dash instead.
+        Both stub labels of a connection are the same cable, so switching <strong>Tag text</strong> on one end
+        switches the other end with it, and a single undo puts both back. It applies to the canvas, PDF export and
+        DXF export alike. A connection with no cable ID — a direct-attach one, for instance — shows a dash instead.
+      </p>
+      <p>
+        To choose what newly stubbed connections start as, use <strong>Preferences → Display → Stub labels →
+        Tag text for new stubs</strong>. It defaults to <em>Destination</em> and applies to every project on this
+        computer. <strong>This project only</strong>, just below it, overrides that for the open schematic and is
+        saved in the schematic file. Neither setting changes stub labels already on the canvas.
       </p>
 
       <h3>Drawing new connections as stubs</h3>

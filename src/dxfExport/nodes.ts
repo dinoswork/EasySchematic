@@ -584,8 +584,10 @@ export function emitStubLabel(
           showArrow: data.showArrow ?? defaults.showArrow,
           showPort: data.showPort ?? defaults.showPort,
           showRoom: data.showRoom ?? defaults.showRoom,
+          // A same-room tag names its room only when explicitly set to (#297).
+          roomInSameRoom: data.showRoom === true,
           pageMode: data.pageMode ?? defaults.pageMode,
-          // Per-stub only, no global default to fall back to (#270).
+          // Per-stub; the default mode setting is stamped at stubbing time (#377).
           labelMode: data.labelMode,
         },
       )

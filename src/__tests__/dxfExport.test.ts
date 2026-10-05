@@ -1712,6 +1712,31 @@ describe("buildDxf — stub labels (#319)", () => {
     expect(texts.filter((t) => t === "?").length).toBe(2);
     expect(texts.filter((t) => t === "C-014").length).toBe(1);
   });
+
+  // Same-room tags drop the room name by default (#297), but an explicit per-tag
+  // "Show room: On" still prints it — and only on that tag.
+  it("prints the room on a same-room tag set to Show room: On, and omits it on the default tag", () => {
+    const sameRoom = [
+      {
+        id: "room-hall",
+        type: "room",
+        position: { x: -40, y: -40 },
+        measured: { width: 1400, height: 200 },
+        data: { label: "Hall" },
+      },
+      ...nodes.map((n) => {
+        if (n.id === "dev-rack-switch") return { ...n, parentId: "room-hall", position: { x: 40, y: 40 } };
+        if (n.id === "dev-lobby-display") return { ...n, parentId: "room-hall", position: { x: 1100, y: 40 } };
+        if (n.id === "stub-a") return { ...n, data: { ...(n.data as object), showRoom: true } };
+        return n;
+      }),
+    ] as unknown as SchematicNode[];
+    const texts = labelTexts(exportWithStubs({ nodes: sameRoom, stubLabelShowRoom: true }));
+    // stub-a is explicitly On: it names the far device's room.
+    expect(texts).toContain(escapeForMText("Lobby Display [LAN 1] (Hall)"));
+    // stub-b follows the default, and both devices share a room, so no room text.
+    expect(texts).toContain(escapeForMText("Rack Switch [Port 12]"));
+  });
 });
 
 // ─── Stub labels across a hidden inline adapter (#348) ───────────────────────

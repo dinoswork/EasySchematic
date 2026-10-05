@@ -944,6 +944,10 @@ export interface SchematicFile {
    *  the app-level preference; unset = fall back to it, then to the built-in surface color.
    *  Applies at placement only — devices already on the canvas keep their own colors. */
   defaultDeviceHeaderColor?: string;
+  /** What both tags of a connection stubbed in THIS project start as (#377). Overrides the
+   *  app-level preference; unset = fall back to it, then to "full". Applies when a
+   *  connection is stubbed only — tags already on the canvas keep their own mode. */
+  defaultStubLabelMode?: StubLabelMode;
   /** Project lifecycle status, surfaced in project metadata / file lists (#P2-007) */
   status?: ProjectStatus;
 }

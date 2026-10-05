@@ -127,6 +127,21 @@ export function resolveStubLabelParts(
   const farRoomLabel = ((farRoom?.data as Record<string, unknown>)?.label as string) ?? "";
   const farPort = resolvePortLabel(farDevice, farHandleId);
 
+  // The device at this tag's OWN end, read past a hidden adapter the same way. When it
+  // sits in the far device's room, the room name is noise on the tag (#297).
+  const { nodeId: nearDeviceId } = hopHiddenAdapters(
+    {
+      nodeId: data.side === "source" ? ownEdge.source : ownEdge.target,
+      handleId: (data.side === "source" ? ownEdge.sourceHandle : ownEdge.targetHandle) ?? null,
+    },
+    ownEdge.id,
+    nodes,
+    edges,
+    ctx.hiddenAdapterIds,
+  );
+  const nearDevice = nodes.find((n) => n.id === nearDeviceId);
+  const sameRoom = !!farDevice.parentId && nearDevice?.parentId === farDevice.parentId;
+
   // Partner stub's position relative to ours drives the arrow direction.
   const partnerStub = findPartnerStub(data.linkedConnectionId, data.side, nodes);
   const nodeMap = new Map(nodes.map((n) => [n.id, n] as const));
@@ -151,6 +166,7 @@ export function resolveStubLabelParts(
   return {
     arrow, farLabel, farPort, farRoom: farRoomLabel, myPage, farPage,
     cableId: resolveCableId(ownEdge, partnerEdge, ctx.cableIdMap),
+    sameRoom,
   };
 }
 

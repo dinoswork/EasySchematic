@@ -46,13 +46,19 @@ import { findFreeAdapterSlot, ADAPTER_GAP, DEVICE_W_EST } from "./adapterPlaceme
 import { resolveHiddenAdapterIds } from "./adapterVisibility";
 import { findPortByHandle } from "./portHandles";
 import { textStubSideForPort, textStubBoxPosition } from "./textStub";
-import { DEFAULT_SCROLL_CONFIG, DEFAULT_LABEL_CASE, DEFAULT_DISTANCE_SETTINGS, DEFAULT_PAN_MODE, DEFAULT_STUB_LABEL_SHOW_ARROW, DEFAULT_STUB_LABEL_SHOW_PORT, DEFAULT_STUB_LABEL_SHOW_ROOM, DEFAULT_STUB_LABEL_PAGE_MODE, DEFAULT_CONNECTION_TYPE, portSide } from "./types";
+import { DEFAULT_SCROLL_CONFIG, DEFAULT_LABEL_CASE, DEFAULT_DISTANCE_SETTINGS, DEFAULT_PAN_MODE, DEFAULT_STUB_LABEL_SHOW_ARROW, DEFAULT_STUB_LABEL_SHOW_PORT, DEFAULT_STUB_LABEL_SHOW_ROOM, DEFAULT_STUB_LABEL_PAGE_MODE, DEFAULT_STUB_LABEL_MODE, DEFAULT_CONNECTION_TYPE, portSide } from "./types";
 import {
   loadAppDefaultHeaderColor,
   normalizeHeaderColor,
   resolveDeviceHeaderColor,
   saveAppDefaultHeaderColor,
 } from "./deviceHeaderColor";
+import {
+  loadAppDefaultStubLabelMode,
+  normalizeStubLabelMode,
+  resolveDefaultStubLabelMode,
+  saveAppDefaultStubLabelMode,
+} from "./stubLabelModeDefault";
 import { pairKey } from "./roomDistance";
 import type { Orientation } from "./printConfig";
 import { computeAlignment, resolveAlignmentOverlaps, type AlignOperation } from "./alignUtils";
@@ -836,6 +842,20 @@ interface SchematicState {
   setAppDefaultDeviceHeaderColor: (color: string | undefined) => void;
   defaultDeviceHeaderColor: string | undefined;
   setDefaultDeviceHeaderColor: (color: string | undefined) => void;
+
+  /** Default stub tag mode (#377) — what both tags of a newly stubbed connection print.
+   *  Same shape as the default header color: the app preference lives in localStorage and
+   *  applies to every project; the project override travels with the file and wins where
+   *  set. Stamped when a connection is stubbed; tags already on the canvas never change. */
+  appDefaultStubLabelMode: import("./types").StubLabelMode;
+  setAppDefaultStubLabelMode: (mode: import("./types").StubLabelMode) => void;
+  defaultStubLabelMode: import("./types").StubLabelMode | undefined;
+  setDefaultStubLabelMode: (mode: import("./types").StubLabelMode | undefined) => void;
+  /** Set what a stub tag prints on BOTH tags of its stubbed connection, as one undo step —
+   *  the two tags are one cable, so they never disagree about it (#376). */
+  setStubLabelMode: (nodeId: string, mode: import("./types").StubLabelMode) => void;
+  /** Flip a stub tag between "full" and "cableId" (and its partner with it), one undo step. */
+  toggleStubLabelMode: (nodeId: string) => void;
   patchStubLabelData: (nodeId: string, patch: Partial<import("./types").StubLabelData>) => void;
   /** Attach a free-text stub to a single device port (#196). No edge/connection is
    *  created; the new node starts in edit mode. */
@@ -2154,6 +2174,8 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   wrapDeviceLabels: false,
   appDefaultDeviceHeaderColor: loadAppDefaultHeaderColor(),
   defaultDeviceHeaderColor: undefined,
+  appDefaultStubLabelMode: loadAppDefaultStubLabelMode(),
+  defaultStubLabelMode: undefined,
   cableIdMap: {},
   cloudSchematicId: null,
   cloudSavedAt: null,
@@ -5235,6 +5257,20 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
     get().saveToLocalStorage();
   },
 
+  // Same split as the header color: the app preference is an editor preference kept in
+  // localStorage, the project override is document data. Neither touches existing tags —
+  // the mode is stamped when a connection is stubbed (#377).
+  setAppDefaultStubLabelMode: (mode) => {
+    const normalized = normalizeStubLabelMode(mode) ?? DEFAULT_STUB_LABEL_MODE;
+    set({ appDefaultStubLabelMode: normalized });
+    saveAppDefaultStubLabelMode(normalized);
+  },
+
+  setDefaultStubLabelMode: (mode) => {
+    set({ defaultStubLabelMode: normalizeStubLabelMode(mode) });
+    get().saveToLocalStorage();
+  },
+
   recomputeCableIds: () => {
     const state = get();
     const rows = computeCableSchedule(state.nodes, state.edges, state.cableNamingScheme);
@@ -6243,6 +6279,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       useShortNames: state.useShortNames || undefined,
       wrapDeviceLabels: state.wrapDeviceLabels || undefined,
       defaultDeviceHeaderColor: state.defaultDeviceHeaderColor,
+      defaultStubLabelMode: state.defaultStubLabelMode,
       hideAdapters: state.hideAdapters || undefined,
       autoRoute: state.autoRoute === false ? false : undefined,
       edgeHitboxSize: state.edgeHitboxSize !== 10 ? state.edgeHitboxSize : undefined,
@@ -6348,6 +6385,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
             useShortNames: data.useShortNames ?? false,
             wrapDeviceLabels: data.wrapDeviceLabels ?? false,
             defaultDeviceHeaderColor: normalizeHeaderColor(data.defaultDeviceHeaderColor),
+            defaultStubLabelMode: normalizeStubLabelMode(data.defaultStubLabelMode),
             hideAdapters: data.hideAdapters ?? false,
             categoryOrder: data.categoryOrder ?? null,
             showOwnedGearPane: data.showOwnedGearPane ?? false,
@@ -6448,6 +6486,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         useShortNames: data.useShortNames ?? false,
         wrapDeviceLabels: data.wrapDeviceLabels ?? false,
         defaultDeviceHeaderColor: normalizeHeaderColor(data.defaultDeviceHeaderColor),
+        defaultStubLabelMode: normalizeStubLabelMode(data.defaultStubLabelMode),
         hideAdapters: data.hideAdapters ?? false,
         autoRoute: data.autoRoute ?? true,
         edgeHitboxSize: data.edgeHitboxSize ?? 10,
@@ -6548,6 +6587,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       useShortNames: state.useShortNames || undefined,
       wrapDeviceLabels: state.wrapDeviceLabels || undefined,
       defaultDeviceHeaderColor: state.defaultDeviceHeaderColor,
+      defaultStubLabelMode: state.defaultStubLabelMode,
       hideAdapters: state.hideAdapters || undefined,
       autoRoute: state.autoRoute === false ? false : undefined,
       edgeHitboxSize: state.edgeHitboxSize !== 10 ? state.edgeHitboxSize : undefined,
@@ -6653,6 +6693,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       useShortNames: data.useShortNames ?? false,
       wrapDeviceLabels: data.wrapDeviceLabels ?? false,
       defaultDeviceHeaderColor: normalizeHeaderColor(data.defaultDeviceHeaderColor),
+      defaultStubLabelMode: normalizeStubLabelMode(data.defaultStubLabelMode),
       hideAdapters: data.hideAdapters ?? false,
       autoRoute: data.autoRoute ?? true,
       edgeHitboxSize: data.edgeHitboxSize ?? 10,
@@ -6780,8 +6821,9 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         defaultConnectionType: DEFAULT_CONNECTION_TYPE,
         useShortNames: false,
         wrapDeviceLabels: false,
-        // The project override resets with the document; the app preference persists.
+        // The project overrides reset with the document; the app preferences persist.
         defaultDeviceHeaderColor: undefined,
+        defaultStubLabelMode: undefined,
         autoRoute: true,
         edgeHitboxSize: 10,
         panMode: DEFAULT_PAN_MODE,
@@ -6846,6 +6888,46 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       }),
     });
     get().saveToLocalStorage();
+  },
+
+  setStubLabelMode: (nodeId, mode) => {
+    const state = get();
+    const tag = state.nodes.find((n) => n.id === nodeId && n.type === "stub-label");
+    if (!tag) return;
+    const linkedId = (tag.data as import("./types").StubLabelData).linkedConnectionId;
+    // The tag and its partner — same linkedConnectionId, other end. Matching on the link
+    // rather than on `side` also picks up a partner a #270-era file left in the other mode.
+    const pairIds = new Set(
+      state.nodes
+        .filter((n) => n.type === "stub-label" && linkedId && (n.data as import("./types").StubLabelData).linkedConnectionId === linkedId)
+        .map((n) => n.id),
+    );
+    pairIds.add(nodeId);
+    // "full" is stored as unset, the way every tag saved before #270 reads.
+    const stored = mode === DEFAULT_STUB_LABEL_MODE ? undefined : mode;
+    const changed = state.nodes.some(
+      (n) => pairIds.has(n.id) && (n.data as import("./types").StubLabelData).labelMode !== stored,
+    );
+    if (!changed) return;
+    // One snapshot for the pair: undo puts both tags back together (#376).
+    pushUndo({ nodes: state.nodes, edges: state.edges });
+    set({
+      nodes: state.nodes.map((n) => {
+        if (!pairIds.has(n.id)) return n;
+        const data = { ...(n.data as import("./types").StubLabelData) };
+        if (stored) data.labelMode = stored;
+        else delete data.labelMode;
+        return { ...n, data } as typeof n;
+      }),
+    });
+    get().saveToLocalStorage();
+  },
+
+  toggleStubLabelMode: (nodeId) => {
+    const tag = get().nodes.find((n) => n.id === nodeId && n.type === "stub-label");
+    if (!tag) return;
+    const current = (tag.data as import("./types").StubLabelData).labelMode;
+    get().setStubLabelMode(nodeId, current === "cableId" ? "full" : "cableId");
   },
 
   addTextStub: (nodeId, portId) => {
@@ -7021,6 +7103,11 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
     const stubNodeIdSrc = `stub-${edge.id}-src`;
     const stubNodeIdTgt = `stub-${edge.id}-tgt`;
     const sigType = edge.data!.signalType;
+    // Both tags start in the default stub tag mode — project override, then app
+    // preference, then "full" (#377). Stamped here so a later change to either setting
+    // leaves these tags alone; "full" stamps nothing, since unset already reads as "full".
+    const labelMode = resolveDefaultStubLabelMode(state.defaultStubLabelMode, state.appDefaultStubLabelMode);
+    const modeStamp = labelMode !== DEFAULT_STUB_LABEL_MODE ? { labelMode } : {};
 
     // Don't stamp data.placed yet — the X above assumes STUB_W_EST (80px), but
     // a wide cable label can produce a 200+ px box. tryPlace's overlap-correction
@@ -7034,7 +7121,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       position: { x: srcStubAbs.x - srcParentAbs.x, y: srcStubAbs.y - srcParentAbs.y },
       ...(srcParentId ? { parentId: srcParentId } : {}),
       zIndex: STUB_LABEL_Z_INDEX, // paint above connection lines (#178)
-      data: { signalType: sigType, linkedConnectionId, side: "source" },
+      data: { signalType: sigType, linkedConnectionId, side: "source", ...modeStamp },
     } as SchematicNode;
     const tgtStubNode: SchematicNode = {
       id: stubNodeIdTgt,
@@ -7042,7 +7129,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       position: { x: tgtStubAbs.x - tgtParentAbs.x, y: tgtStubAbs.y - tgtParentAbs.y },
       ...(tgtParentId ? { parentId: tgtParentId } : {}),
       zIndex: STUB_LABEL_Z_INDEX, // paint above connection lines (#178)
-      data: { signalType: sigType, linkedConnectionId, side: "target" },
+      data: { signalType: sigType, linkedConnectionId, side: "target", ...modeStamp },
     } as SchematicNode;
 
     const baseData = { ...edge.data! };

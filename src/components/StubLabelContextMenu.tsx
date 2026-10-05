@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { useSchematicStore } from "../store";
-import type { StubLabelData, StubLabelMode, StubLabelPageMode } from "../types";
+import type { StubLabelData, StubLabelPageMode } from "../types";
 import { selectedConnectionEdges, stubbedLinkIdsOf } from "../stubSelection";
 import { useContextMenuPosition } from "../hooks/useContextMenuPosition";
 
@@ -65,14 +65,13 @@ export default function StubLabelContextMenu() {
 
   // "Cable ID only" turns the tag into a plain cable tag — no destination device, port,
   // room or page, whatever those toggles say (#270). Two states only, so this is a
-  // straight flip rather than a Default/on/off cycle: there is no global to defer to.
+  // straight flip rather than a Default/on/off cycle: the default-mode setting (#377) is
+  // applied when a connection is stubbed, not deferred to here. The flip covers both tags
+  // of the connection in one undo step, since they are one cable (#376).
   const toggleLabelMode = useCallback(() => {
     if (!menu) return;
     const store = useSchematicStore.getState();
-    const node = store.nodes.find((n) => n.id === menu.nodeId);
-    const current = (node?.data as StubLabelData | undefined)?.labelMode;
-    const next: StubLabelMode | undefined = current === "cableId" ? undefined : "cableId";
-    store.patchStubLabelData(menu.nodeId, { labelMode: next });
+    store.toggleStubLabelMode(menu.nodeId);
     useSchematicStore.setState({ stubLabelContextMenu: null });
   }, [menu]);
 
@@ -106,7 +105,9 @@ export default function StubLabelContextMenu() {
 
   const showArrowLabel = boolItemLabel("Show arrow", data?.showArrow, store.stubLabelShowArrow);
   const showPortLabel = boolItemLabel("Show port", data?.showPort, store.stubLabelShowPort);
-  const showRoomLabel = boolItemLabel("Show room", data?.showRoom, store.stubLabelShowRoom);
+  // The room default is "other rooms only" — a same-room tag leaves it off unless the tag
+  // itself is set On (#297) — so the Default label says so rather than a bare "on".
+  const showRoomLabel = boolItemLabel("Show room", data?.showRoom, store.stubLabelShowRoom, "other rooms");
   const pageModeLabel = pageModeItemLabel(data?.pageMode, store.stubLabelPageMode);
   // The four content toggles say nothing about a cable-ID-only tag, so they come off the
   // menu in that mode rather than sitting there doing nothing when clicked.
@@ -159,8 +160,8 @@ export default function StubLabelContextMenu() {
   );
 }
 
-function boolItemLabel(prefix: string, override: boolean | undefined, globalVal: boolean): string {
-  if (override === undefined) return `${prefix}: Default (${globalVal ? "on" : "off"})`;
+function boolItemLabel(prefix: string, override: boolean | undefined, globalVal: boolean, onText = "on"): string {
+  if (override === undefined) return `${prefix}: Default (${globalVal ? onText : "off"})`;
   return `${prefix}: ${override ? "On" : "Off"}`;
 }
 

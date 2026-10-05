@@ -53,7 +53,7 @@ function StubLabelNodeComponent({ id, data, selected }: NodeProps<StubLabelNodeT
       cableIdMap: s.cableIdMap,
     });
     if (!parts) return "";
-    return [parts.arrow, parts.farLabel, parts.farPort, parts.farRoom, parts.myPage, parts.farPage, parts.cableId].join("\0");
+    return [parts.arrow, parts.farLabel, parts.farPort, parts.farRoom, parts.myPage, parts.farPage, parts.cableId, parts.sameRoom ? "1" : ""].join("\0");
   });
 
   const showArrowGlobal = useSchematicStore((s) => s.stubLabelShowArrow);
@@ -63,8 +63,10 @@ function StubLabelNodeComponent({ id, data, selected }: NodeProps<StubLabelNodeT
   const effectiveShowArrow = data.showArrow ?? showArrowGlobal;
   const effectiveShowPort = data.showPort ?? showPortGlobal;
   const effectiveShowRoom = data.showRoom ?? showRoomGlobal;
+  const forceRoom = data.showRoom === true;
   const effectivePageMode = data.pageMode ?? pageModeGlobal;
-  // Per-stub only — there is no global "every tag is a cable tag" setting (#270).
+  // Per-stub. The default stub tag mode setting (#377) is stamped onto the tag when the
+  // connection is stubbed, so an unset mode here is always "full".
   const effectiveLabelMode = data.labelMode ?? DEFAULT_STUB_LABEL_MODE;
 
   // Auto-place: once per stub (lifetime, not per mount), align Y with the connected
@@ -179,7 +181,7 @@ function StubLabelNodeComponent({ id, data, selected }: NodeProps<StubLabelNodeT
   const displayLabel = useDisplayLabel();
   const text = useMemo(() => {
     if (!labelStr) return UNRESOLVED_STUB_LABEL_TEXT;
-    const [arrow, farLabel, farPort, farRoom, myPage, farPage, cableId] = labelStr.split("\0");
+    const [arrow, farLabel, farPort, farRoom, myPage, farPage, cableId, sameRoom] = labelStr.split("\0");
     return buildStubLabelText(
       // The far device's name and its room are labels like any other, so the auto-case
       // preference applies to them here too (#294). Applied to the parts rather than the
@@ -190,13 +192,15 @@ function StubLabelNodeComponent({ id, data, selected }: NodeProps<StubLabelNodeT
       //
       // cableId is likewise left alone: it is an identifier the user prints on a physical
       // label, not a device name, so the auto-case preference must not rewrite it.
-      { arrow, farLabel: displayLabel(farLabel), farPort, farRoom: displayLabel(farRoom), myPage, farPage, cableId },
+      { arrow, farLabel: displayLabel(farLabel), farPort, farRoom: displayLabel(farRoom), myPage, farPage, cableId, sameRoom: sameRoom === "1" },
       {
         showArrow: effectiveShowArrow, showPort: effectiveShowPort, showRoom: effectiveShowRoom,
+        // Only an explicit "Show room: On" names the tag's own room (#297).
+        roomInSameRoom: forceRoom,
         pageMode: effectivePageMode, labelMode: effectiveLabelMode,
       },
     );
-  }, [labelStr, effectiveShowArrow, effectiveShowPort, effectiveShowRoom, effectivePageMode, effectiveLabelMode, displayLabel]);
+  }, [labelStr, effectiveShowArrow, effectiveShowPort, effectiveShowRoom, forceRoom, effectivePageMode, effectiveLabelMode, displayLabel]);
 
   // Per-signal color overrides apply here as they do to the connection itself — a
   // recolored signal type used to leave the stub box on the stock color while its own

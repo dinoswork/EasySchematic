@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useSchematicStore } from "../store";
 import { HEADER_COLOR_SWATCH_FALLBACK, resolveDefaultDeviceHeaderColor } from "../deviceHeaderColor";
-import { DEFAULT_SCROLL_CONFIG, DEFAULT_STUB_LABEL_SHOW_ARROW, DEFAULT_STUB_LABEL_SHOW_PORT, DEFAULT_STUB_LABEL_PAGE_MODE, DEFAULT_CONNECTION_TYPE, PROJECT_STATUS_LABELS } from "../types";
-import type { DefaultConnectionType, LabelCaseMode, PanMode, ProjectStatus, ScrollAction, ScrollConfig, StubLabelPageMode } from "../types";
+import { DEFAULT_SCROLL_CONFIG, DEFAULT_STUB_LABEL_SHOW_ARROW, DEFAULT_STUB_LABEL_SHOW_PORT, DEFAULT_STUB_LABEL_PAGE_MODE, DEFAULT_STUB_LABEL_MODE, DEFAULT_CONNECTION_TYPE, PROJECT_STATUS_LABELS } from "../types";
+import type { DefaultConnectionType, LabelCaseMode, PanMode, ProjectStatus, ScrollAction, ScrollConfig, StubLabelMode, StubLabelPageMode } from "../types";
 
 const AUTOROUTE_PREF_KEY = "easyschematic-autoroute-pref";
 
@@ -191,6 +191,10 @@ export default function PreferencesDialog({ onClose }: { onClose: () => void }) 
   const setStubLabelShowRoom = useSchematicStore((s) => s.setStubLabelShowRoom);
   const stubLabelPageMode = useSchematicStore((s) => s.stubLabelPageMode);
   const setStubLabelPageMode = useSchematicStore((s) => s.setStubLabelPageMode);
+  const appStubLabelMode = useSchematicStore((s) => s.appDefaultStubLabelMode);
+  const setAppStubLabelMode = useSchematicStore((s) => s.setAppDefaultStubLabelMode);
+  const projectStubLabelMode = useSchematicStore((s) => s.defaultStubLabelMode);
+  const setProjectStubLabelMode = useSchematicStore((s) => s.setDefaultStubLabelMode);
   const defaultConnectionType = useSchematicStore((s) => s.defaultConnectionType);
   const setDefaultConnectionType = useSchematicStore((s) => s.setDefaultConnectionType);
   const useShortNames = useSchematicStore((s) => s.useShortNames);
@@ -238,7 +242,9 @@ export default function PreferencesDialog({ onClose }: { onClose: () => void }) 
     defaultConnectionType === DEFAULT_CONNECTION_TYPE &&
     // The per-project override is document data (like the project status), so it is not
     // part of "reset preferences" — only the app-level default header color is (#354).
-    appHeaderColor === undefined;
+    appHeaderColor === undefined &&
+    // Same split for the default stub tag mode: only the app preference resets (#377).
+    appStubLabelMode === DEFAULT_STUB_LABEL_MODE;
 
   return (
     <div
@@ -600,7 +606,7 @@ export default function PreferencesDialog({ onClose }: { onClose: () => void }) 
                   />
                 </div>
                 <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
-                  Adds the destination room (e.g. <code className="text-[10px]">(Server Room)</code>) after the device name on stubbed connections. Per-stub overrides via right-click on the label.
+                  Adds the destination room (e.g. <code className="text-[10px]">(Server Room)</code>) after the device name on stubbed connections, when the far device is in a different room. A tag between two devices in the same room leaves the room off unless you right-click it and set Show room to On.
                 </p>
                 <div className="flex items-center justify-between py-1 mt-2">
                   <span className="text-xs text-[var(--color-text)]">Page number on stub labels</span>
@@ -616,6 +622,38 @@ export default function PreferencesDialog({ onClose }: { onClose: () => void }) 
                 </div>
                 <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
                   When to display the destination page on stub labels. Cross-page only suppresses the tag when both ends are on the same printed page.
+                </p>
+                {/* Default stub tag mode (#377) — same app + project pair as the header color (#354) */}
+                <div className="flex items-center justify-between py-1 mt-2">
+                  <span className="text-xs text-[var(--color-text)]">Tag text for new stubs</span>
+                  <select
+                    className={selectClass}
+                    value={appStubLabelMode}
+                    onChange={(e) => setAppStubLabelMode(e.target.value as StubLabelMode)}
+                  >
+                    <option value="full">Destination</option>
+                    <option value="cableId">Cable ID only</option>
+                  </select>
+                </div>
+                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+                  What both tags of a connection show when you stub it, in this and every other project on this computer. Destination names the far device; Cable ID only shows just the cable ID.
+                </p>
+                <div className="flex items-center justify-between py-1 mt-2">
+                  <span className="text-xs text-[var(--color-text)]">This project only</span>
+                  <select
+                    className={selectClass}
+                    value={projectStubLabelMode ?? ""}
+                    onChange={(e) =>
+                      setProjectStubLabelMode(e.target.value === "" ? undefined : (e.target.value as StubLabelMode))
+                    }
+                  >
+                    <option value="">Use default</option>
+                    <option value="full">Destination</option>
+                    <option value="cableId">Cable ID only</option>
+                  </select>
+                </div>
+                <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+                  Overrides the default above for this schematic, and is saved in the schematic file. Stub tags already on the canvas keep their tag text either way; right-click a tag to switch it, and its partner tag at the other end switches with it.
                 </p>
               </div>
 
@@ -767,6 +805,7 @@ export default function PreferencesDialog({ onClose }: { onClose: () => void }) 
                 setStubLabelPageMode(DEFAULT_STUB_LABEL_PAGE_MODE);
                 setDefaultConnectionType(DEFAULT_CONNECTION_TYPE);
                 setAppHeaderColor(undefined);
+                setAppStubLabelMode(DEFAULT_STUB_LABEL_MODE);
               }}
               className="text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-text)] cursor-pointer"
             >
