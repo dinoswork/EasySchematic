@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import type { Port, SlotDefinition, DeviceTemplate } from "../../../src/types";
+import { buildBulkSlots } from "../../../src/slotBulk";
 import { fetchTemplate, fetchSearchTerms, loadAllTemplates, fetchDraft, fetchManufacturers, fetchSubmission } from "../api";
 import { linkClick } from "../navigate";
 import PortEditor from "./PortEditor";
@@ -594,6 +595,9 @@ export default function DeviceForm({ id, draftId, cloneId, pendingSubmissionId, 
 
 // ==================== Slot Editor ====================
 
+/** Mirrors MAX_SLOTS in api/src/validate.ts — the API rejects a template with more slots. */
+const MAX_SLOTS = 128;
+
 function SlotEditor({
   slots,
   onChange,
@@ -604,12 +608,36 @@ function SlotEditor({
   allTemplates: DeviceTemplate[];
 }) {
   const [open, setOpen] = useState(slots.length > 0);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkPrefix, setBulkPrefix] = useState("Slot");
+  const [bulkStart, setBulkStart] = useState(1);
+  const [bulkCount, setBulkCount] = useState(4);
+  const [bulkFamily, setBulkFamily] = useState("");
   const knownFamilies = [...new Set(allTemplates.filter((t) => t.slotFamily).map((t) => t.slotFamily!))];
 
   const addSlot = () => {
     const id = `slot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     onChange([...slots, { id, label: `Slot ${slots.length + 1}`, slotFamily: "" }]);
     setOpen(true);
+  };
+
+  const bulkRoom = Math.max(0, MAX_SLOTS - slots.length);
+  const bulkCanAdd = !!bulkPrefix.trim() && !!bulkFamily.trim() && Math.floor(bulkCount) >= 1 && bulkRoom > 0;
+
+  const addBulkSlots = () => {
+    // The API rejects an empty slotFamily and more than MAX_SLOTS slots, so a bulk add that
+    // violated either would just produce N failing slots.
+    const count = Math.min(Math.floor(bulkCount), bulkRoom);
+    const start = Math.floor(bulkStart);
+    if (!bulkPrefix.trim() || !bulkFamily.trim() || !(count >= 1) || !Number.isFinite(start)) return;
+    const stamp = Date.now();
+    const created: SlotDefinition[] = buildBulkSlots(bulkPrefix.trim(), start, count, bulkFamily.trim()).map((s, i) => ({
+      id: `slot-${stamp}-${Math.random().toString(36).slice(2, 6)}-${i}`,
+      ...s,
+    }));
+    onChange([...slots, ...created]);
+    setOpen(true);
+    setBulkOpen(false);
   };
 
   const removeSlot = (index: number) => {
@@ -631,13 +659,70 @@ function SlotEditor({
           Expansion Slots
           {slots.length > 0 && <span className="text-xs text-slate-400 dark:text-slate-500 font-normal ml-1">({slots.length})</span>}
         </button>
-        <button
-          onClick={addSlot}
-          className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer"
-        >
-          + Add Slot
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => {
+              if (!bulkOpen) setBulkStart(slots.length + 1);
+              setBulkOpen(!bulkOpen);
+              setOpen(true);
+            }}
+            className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer"
+          >
+            Bulk Add
+          </button>
+          <button
+            onClick={addSlot}
+            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer"
+          >
+            + Add Slot
+          </button>
+        </div>
       </div>
+
+      {bulkOpen && (
+        <div className="mb-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-wrap gap-3 items-end">
+          <label className="text-xs">
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">Prefix</span>
+            <input value={bulkPrefix} onChange={(e) => setBulkPrefix(e.target.value)} className="w-full sm:w-20 px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm" />
+          </label>
+          <label className="text-xs">
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">Start #</span>
+            <input type="number" value={bulkStart} onChange={(e) => setBulkStart(+e.target.value)} className="w-full sm:w-16 px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm" />
+          </label>
+          <label className="text-xs">
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">Count</span>
+            <input type="number" value={bulkCount} onChange={(e) => setBulkCount(+e.target.value)} className="w-full sm:w-16 px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm" />
+          </label>
+          <label className="text-xs">
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">Slot Family</span>
+            <input
+              value={bulkFamily}
+              onChange={(e) => setBulkFamily(e.target.value)}
+              list="slot-families-bulk"
+              placeholder="e.g. yamaha-my"
+              className="w-full sm:w-40 px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm"
+            />
+            <datalist id="slot-families-bulk">
+              {knownFamilies.map((f) => <option key={f} value={f} />)}
+            </datalist>
+          </label>
+          <button
+            onClick={addBulkSlots}
+            disabled={!bulkCanAdd}
+            className="w-full sm:w-auto px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Add
+          </button>
+          {!bulkFamily.trim() && (
+            <p className="w-full text-xs text-slate-500 dark:text-slate-400">Slot family is required.</p>
+          )}
+          {bulkRoom === 0 ? (
+            <p className="w-full text-xs text-amber-600 dark:text-amber-400">A device can have at most {MAX_SLOTS} slots.</p>
+          ) : Math.floor(bulkCount) > bulkRoom ? (
+            <p className="w-full text-xs text-amber-600 dark:text-amber-400">Only {bulkRoom} more slot{bulkRoom === 1 ? "" : "s"} fit (max {MAX_SLOTS}); the count will be capped.</p>
+          ) : null}
+        </div>
+      )}
 
       {open && slots.length === 0 && (
         <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">No expansion slots defined. Add a slot for devices with modular card bays.</p>

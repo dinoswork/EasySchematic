@@ -127,6 +127,16 @@ export default function DevicesAndPortsPage() {
         </tbody>
       </table>
 
+      <h2>Adding ports in bulk</h2>
+      <p>
+        In the device editor, <strong>+ Bulk Add</strong> in any port section header creates a
+        numbered range of ports at once. Pick a <strong>prefix</strong>, the <strong>from</strong> and
+        <strong> to</strong> numbers, the <strong>signal type</strong> and the <strong>connector</strong>.
+        The connector starts on the signal{"'"}s usual one, so a fiber switch can get SFP ports without
+        editing each Ethernet port afterwards. Untick <strong>Space before number</strong> to name ports
+        "Port1" instead of "Port 1". The preview line shows the names before you add them.
+      </p>
+
       <h2>Port sections</h2>
       <p>
         Devices with many ports can organize them into <strong>sections</strong> — logical groupings like "Video",

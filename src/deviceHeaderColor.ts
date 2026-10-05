@@ -71,6 +71,37 @@ export function resolveDeviceHeaderColor(
   );
 }
 
+/**
+ * The header color a device wears after "Revert to Template" or "Revert to Preset" (#382).
+ *
+ * A revert is a reset to what a freshly placed device would look like, so it resolves the same
+ * precedence placement does — and the header color the user picked on the device is dropped,
+ * not carried over. Reverting to a *template* skips the project preset (the template is the
+ * target, the way the body color is taken straight from it); reverting to a *preset* uses the
+ * preset's color first. If nothing saved supplies one, the result is the default settings'
+ * color, or undefined when there are none, leaving the device with no stored color.
+ *
+ * The editor pairs this with clearing its "picker worked" flag, so a later save sees an
+ * inherited color rather than a deliberate one and the capture rule above does not bake the
+ * default into a template or preset.
+ */
+export function headerColorAfterRevert(
+  target: "template" | "preset",
+  sources: {
+    presetHeaderColor: string | undefined;
+    templateHeaderColor: string | undefined;
+    projectDefault: string | undefined;
+    appDefault: string | undefined;
+  },
+): string | undefined {
+  return resolveDeviceHeaderColor(
+    target === "preset" ? sources.presetHeaderColor : undefined,
+    sources.templateHeaderColor,
+    sources.projectDefault,
+    sources.appDefault,
+  );
+}
+
 /** What the device editor knows about the header color it is about to save. */
 export interface HeaderColorCapture {
   /** The header color the editor is showing for this device. */

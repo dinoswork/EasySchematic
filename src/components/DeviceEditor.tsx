@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo, type DragEvent } from "react";
 import { useSchematicStore } from "../store";
-import { buildBulkSlots } from "../slotBulk";
+import { buildBulkSlots, bulkLabel } from "../slotBulk";
+import { buildBulkPorts, type BulkPortSpec } from "../portBulk";
+import { MAX_PORTS } from "../import/validate";
 import { autoNamePorts, duplicatePortLabel } from "../portNaming";
 import {
   SIGNAL_LABELS,
@@ -36,7 +38,7 @@ import FacePlateEditor from "./FacePlateEditor";
 import type { FacePlateLayout } from "../types";
 import { AUX_FIELD_GROUPS, normalizeAuxRows, resolveAuxiliaryLine, trimTrailingEmpty } from "../auxiliaryData";
 import { deriveThermalBtuh } from "../thermal";
-import { HEADER_COLOR_SWATCH_FALLBACK, normalizeHeaderColor, resolveDeviceHeaderColor, type HeaderColorCapture } from "../deviceHeaderColor";
+import { HEADER_COLOR_SWATCH_FALLBACK, headerColorAfterRevert, normalizeHeaderColor, resolveDeviceHeaderColor, type HeaderColorCapture } from "../deviceHeaderColor";
 import { buildDeviceTemplate, buildTemplatePreset, type PortDraft } from "../deviceTemplateBuild";
 import { carriesPowerCapacity } from "../deviceTypeCategories";
 import { visibleSaveActions, SAVE_ACTION_LABELS, SAVE_ACTION_TITLES, type SaveActionId } from "../deviceEditorActions";
@@ -759,6 +761,15 @@ export default function DeviceEditor() {
     }));
     setHiddenPorts([]);
     setColor(tpl.color);
+    // Header color too (#382): drop whatever was picked on this device and take what a freshly
+    // placed one would get. Clearing the edited flag means a later save treats it as inherited.
+    setHeaderColor(headerColorAfterRevert("template", {
+      presetHeaderColor: undefined,
+      templateHeaderColor: tpl.headerColor,
+      projectDefault: projectHeaderColor,
+      appDefault: appHeaderColor,
+    }));
+    setHeaderColorEdited(false);
 
     // For user templates, also revert all editable metadata fields
     if (customTemplates.some((t) => t.id === templateId)) {
@@ -785,7 +796,7 @@ export default function DeviceEditor() {
       setAuxiliaryData(normalizeAuxRows(tpl.auxiliaryData));
       setSearchTermsRaw((tpl.searchTerms ?? []).join(", "));
     }
-  }, [node, customTemplates]);
+  }, [node, customTemplates, projectHeaderColor, appHeaderColor]);
 
   const handleRevertToPreset = useCallback(() => {
     if (!node?.data.templateId) return;
@@ -813,7 +824,14 @@ export default function DeviceEditor() {
     })));
     setHiddenPorts(preset.hiddenPorts ?? []);
     setColor(preset.color);
-  }, [node, templatePresets]);
+    setHeaderColor(headerColorAfterRevert("preset", {
+      presetHeaderColor: preset.headerColor,
+      templateHeaderColor: getTemplateById(node.data.templateId, customTemplates)?.headerColor,
+      projectDefault: projectHeaderColor,
+      appDefault: appHeaderColor,
+    }));
+    setHeaderColorEdited(false);
+  }, [node, templatePresets, customTemplates, projectHeaderColor, appHeaderColor]);
 
   const addPort = (direction: PortDirection) => {
     setPorts([...ports, newPortDraft(direction)]);
@@ -849,20 +867,12 @@ export default function DeviceEditor() {
     setPorts(ports.map((p) => (p.id === id ? { ...p, ...updates } : p)));
   };
 
-  const bulkAddPorts = (direction: PortDirection, prefix: string, start: number, count: number, signalType: SignalType, section: string) => {
-    const newPorts: PortDraft[] = [];
-    const connectorType = DEFAULT_CONNECTOR[signalType];
-    const multiConnect = shouldDefaultMultiConnect(signalType, connectorType) || undefined;
-    for (let i = 0; i < count; i++) {
-      newPorts.push({
-        id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${i}`,
-        label: `${prefix} ${start + i}`,
-        signalType,
-        direction,
-        section: section || undefined,
-        multiConnect,
-      });
-    }
+  const bulkAddPorts = (spec: BulkPortSpec) => {
+    // Cap at the API's port limit so a typo'd range can't build a device the library rejects.
+    const count = Math.min(Math.floor(spec.count), Math.max(0, MAX_PORTS - ports.length));
+    if (count < 1) return;
+    const stamp = Date.now();
+    const newPorts = buildBulkPorts({ ...spec, start: Math.floor(spec.start), count }, (i) => `draft-${stamp}-${Math.random().toString(36).slice(2, 6)}-${i}`);
     setPorts([...ports, ...newPorts]);
   };
 
@@ -1956,19 +1966,21 @@ function BulkAddForm({
   onClose,
 }: {
   direction: PortDirection;
-  onBulkAdd: (direction: PortDirection, prefix: string, start: number, count: number, signalType: SignalType, section: string) => void;
+  onBulkAdd: (spec: BulkPortSpec) => void;
   onClose: () => void;
 }) {
   const [prefix, setPrefix] = useState("Input");
   const [start, setStart] = useState(1);
   const [end, setEnd] = useState(8);
   const [signalType, setSignalType] = useState<SignalType>("sdi");
+  const [connectorType, setConnectorType] = useState<ConnectorType>(DEFAULT_CONNECTOR["sdi"]);
+  const [spaceBeforeNumber, setSpaceBeforeNumber] = useState(true);
   const [section, setSection] = useState("");
 
   const handleSubmit = () => {
     const count = end - start + 1;
     if (count < 1 || !prefix.trim()) return;
-    onBulkAdd(direction, prefix.trim(), start, count, signalType, section.trim());
+    onBulkAdd({ direction, prefix: prefix.trim(), start, count, signalType, connectorType, section: section.trim() || undefined, spaceBeforeNumber });
     onClose();
   };
 
@@ -2008,13 +2020,42 @@ function BulkAddForm({
         <select
           className="bg-[var(--color-surface)] text-[var(--color-text)] border border-[var(--color-border)] rounded px-1 py-1 text-xs outline-none focus:border-blue-500 cursor-pointer"
           value={signalType}
-          onChange={(e) => setSignalType(e.target.value as SignalType)}
+          title="Signal type"
+          onChange={(e) => {
+            const next = e.target.value as SignalType;
+            setSignalType(next);
+            setConnectorType(DEFAULT_CONNECTOR[next]);
+          }}
         >
           {ALL_SIGNAL_TYPES.map((t) => (
             <option key={t} value={t}>{SIGNAL_LABELS[t]}</option>
           ))}
         </select>
+        <select
+          className="bg-[var(--color-surface)] text-[var(--color-text)] border border-[var(--color-border)] rounded px-1 py-1 text-xs outline-none focus:border-blue-500 cursor-pointer max-w-[140px]"
+          value={connectorType}
+          title="Connector type"
+          onChange={(e) => setConnectorType(e.target.value as ConnectorType)}
+        >
+          {CONNECTOR_GROUP_ENTRIES.map(([groupName, types]) => (
+            <optgroup key={groupName} label={groupName}>
+              {types.map((c) => (
+                <option key={c} value={c}>
+                  {CONNECTOR_LABELS[c]}{c === DEFAULT_CONNECTOR[signalType] ? " (default)" : ""}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
       </div>
+      <label className="flex items-center gap-1.5 text-[10px] text-[var(--color-text-muted)] cursor-pointer">
+        <input
+          type="checkbox"
+          checked={spaceBeforeNumber}
+          onChange={(e) => setSpaceBeforeNumber(e.target.checked)}
+        />
+        Space before number
+      </label>
       <div className="flex items-center gap-1.5">
         <span className="text-[10px] text-[var(--color-text-muted)]">Section:</span>
         <input
@@ -2038,8 +2079,13 @@ function BulkAddForm({
         </button>
       </div>
       <div className="text-[10px] text-[var(--color-text-muted)]">
-        Preview: {prefix} {start}, {prefix} {start + 1}, ... {prefix} {end}
+        Preview: {bulkLabel(prefix, start, spaceBeforeNumber)}, {bulkLabel(prefix, start + 1, spaceBeforeNumber)}, ... {bulkLabel(prefix, end, spaceBeforeNumber)}
       </div>
+      {!spaceBeforeNumber && /\d$/.test(prefix.trim()) && (
+        <div className="text-[10px] text-amber-500">
+          Prefix ends in a digit — consider the space option
+        </div>
+      )}
     </div>
   );
 }
@@ -2278,7 +2324,7 @@ function PortSection({
   deviceType: string;
   ports: PortDraft[];
   onAdd: () => void;
-  onBulkAdd: (direction: PortDirection, prefix: string, start: number, count: number, signalType: SignalType, section: string) => void;
+  onBulkAdd: (spec: BulkPortSpec) => void;
   onRemove: (id: string) => void;
   onDuplicate: (id: string) => void;
   onUpdate: (id: string, updates: Partial<PortDraft>) => void;

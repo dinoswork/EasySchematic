@@ -92,7 +92,9 @@ export default function DeviceLibraryPage() {
         When editing a device that has a preset, a blue banner shows the active preset with
         a <strong>Clear</strong> button. If the device's configuration has drifted from the preset,
         you'll see <strong>Revert to Preset</strong> and <strong>Revert to Template</strong> buttons
-        to restore either baseline.
+        to restore either baseline. Reverting also resets the device{"'"}s header color to what a newly placed
+        device would get from that preset or template, then your default header color, so a color you
+        picked on the device itself is dropped.
       </p>
 
       <h2>Auto-numbering</h2>

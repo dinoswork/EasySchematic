@@ -8,7 +8,8 @@ const VALID_DEVICE_TYPES = new Set(Object.keys(DEVICE_TYPE_TO_CATEGORY));
 const VALID_DIRECTIONS = new Set(["input", "output", "bidirectional"]);
 
 const MAX_STRING = 200;
-const MAX_PORTS = 500;
+/** Mirrors MAX_PORTS in api/src/validate.ts. */
+export const MAX_PORTS = 500;
 
 export interface TemplateValidationResult {
   /** True if the template can be saved as-is. */
