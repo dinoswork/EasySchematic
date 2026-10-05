@@ -227,6 +227,47 @@ describe("test schematic — #307 coverage", () => {
     expect(complete.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("offers a compatible, unwired same-signal HDMI pair within one viewport (#378)", () => {
+    // #366's verification had to substitute devices: the only HDMI source (Designer
+    // Laptop) was 1900+ flow units from the nearest HDMI input. A connection drag
+    // needs both ends on screen at 100% zoom, so the pair must fit one viewport.
+    const used = usedPortIds();
+    const roomById = new Map(rooms.map((r) => [r.id, r]));
+    const abs = (d: SchematicNode) => {
+      const room = d.parentId ? roomById.get(d.parentId) : undefined;
+      return { x: d.position.x + (room?.position.x ?? 0), y: d.position.y + (room?.position.y ?? 0) };
+    };
+    const ownerOf = (portId: string) => devices.find((d) => d.data.ports.some((p) => p.id === portId))!;
+    const outs = allPorts.filter((p) => p.connectorType === "hdmi" && p.direction === "output" && !used.has(p.id));
+    const ins = allPorts.filter((p) => p.connectorType === "hdmi" && p.direction === "input" && !used.has(p.id));
+    // A 1280x720 box is the small end of a real 100%-zoom canvas.
+    const VIEW_W = 1280;
+    const VIEW_H = 720;
+    const pair = outs.flatMap((o) => ins.map((i) => [o, i] as const)).find(([o, i]) => {
+      const a = ownerOf(o.id);
+      const b = ownerOf(i.id);
+      if (a.id === b.id || o.signalType !== i.signalType) return false;
+      const pa = abs(a);
+      const pb = abs(b);
+      const w = Math.max(pa.x + (a.measured?.width ?? 0), pb.x + (b.measured?.width ?? 0)) - Math.min(pa.x, pb.x);
+      const h = Math.max(pa.y + (a.measured?.height ?? 0), pb.y + (b.measured?.height ?? 0)) - Math.min(pa.y, pb.y);
+      return w <= VIEW_W && h <= VIEW_H;
+    });
+    expect(pair, "no free same-signal HDMI out/in pair fits one 100%-zoom viewport").toBeDefined();
+    const [outPort, inPort] = pair!;
+    expect(areConnectorsCompatible(outPort.connectorType, inPort.connectorType)).toBe(true);
+    expect(needsAdapter(outPort.connectorType, inPort.connectorType)).toBe(false);
+  });
+
+  it("carries an unwired patch panel that can be virtualized (#378)", () => {
+    const panels = devices.filter((d) => d.data.deviceType === "patch-panel" && d.data.ports.some((p) => p.direction === "passthrough"));
+    const unwired = panels.filter((d) => !fixture.edges.some((e) => e.source === d.id || e.target === d.id));
+    expect(unwired.length, "no passthrough patch panel without connections").toBeGreaterThanOrEqual(1);
+    // PP-01 is the wired one, so the unwired one has to be a different panel.
+    expect(unwired.some((d) => d.id !== "device-8")).toBe(true);
+    expect(unwired[0].data.ports.filter((p) => p.direction === "passthrough").length).toBeGreaterThanOrEqual(2);
+  });
+
   it("names rooms so all four label-case modes are distinguishable", () => {
     const labels = rooms.map((r) => (r.data as { label: string }).label);
     expect(labels.length).toBeGreaterThanOrEqual(2);

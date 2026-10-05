@@ -17,6 +17,11 @@
  *   - mirrored adapter families left unwired: XLR-3 ↔ 1/4" TRS and Edison ↔ IEC
  *   - a patch panel with passthrough circuits across a wide spread of
  *     connector and gender combinations, two of them patched end to end
+ *   - a compatible same-signal HDMI pair (Designer Laptop out, Preview Monitor in)
+ *     sitting within one 100%-zoom viewport of each other, unwired, so
+ *     connection-drag / ghost scenarios don't need substitute devices (#378)
+ *   - an unwired patch panel (PP-02), the only one `setPanelOffCanvas` will
+ *     virtualize — PP-01 carries wired legs and is refused (#378)
  *   - three named rooms plus two deliberately roomless devices (blank sentinel)
  *   - a room named in mixed case ("main Hall"), one acronym room and one
  *     all-caps room, so all four label-case modes are distinguishable
@@ -318,6 +323,18 @@ const laptopLan = port("laptop-lan", "LAN", "ethernet", "bidirectional", "rj45",
   networkConfig: { dhcp: true },
 });
 const laptopHdmiOut = port("laptop-hdmi-out", "HDMI Out", "hdmi", "output", "hdmi");
+
+// HDMI sink for the close-range drag pair (#378). The only other HDMI source in
+// the fixture, Designer Laptop's out port, now has a same-signal input within one
+// viewport of it; before this the nearest was the projector, 1900+ flow units away.
+const pvMonHdmiIn = port("pvmon-hdmi-in", "HDMI In", "hdmi", "input", "hdmi");
+
+// Second patch panel, deliberately left with no connections (#378). A wired panel
+// can't be virtualized (setPanelOffCanvas refuses), and PP-01 carries four legs.
+const pp2Rj45 = through("pp2-1", "1 — Cat6", "rj45", "rj45", { rearGender: "female", frontGender: "female" });
+const pp2Bnc = through("pp2-2", "2 — BNC", "bnc", "bnc", { rearGender: "female", frontGender: "female" });
+const pp2Xlr = through("pp2-3", "3 — XLR-3", "xlr-3", "xlr-3", { rearGender: "female", frontGender: "male" });
+const pp2Fiber = through("pp2-4", "4 — LC Fiber", "lc", "lc");
 
 // Roomless devices — the blank room sentinel
 const csL1 = port("cs-l1", "Feed L1", "power-l1", "output", "cam-lok");
@@ -722,6 +739,21 @@ const techTable: RoomSpec = {
           auxiliaryData: [{ text: "{{deviceType}}", position: "header" }],
         },
       },
+      {
+        // Unwired on purpose (#378): the panel to virtualize / drag legs onto.
+        // Kept apart from PP-01, whose wired legs make setPanelOffCanvas refuse.
+        id: "device-26",
+        label: "PP-02",
+        ports: [pp2Rj45, pp2Bnc, pp2Xlr, pp2Fiber],
+        data: {
+          deviceType: "patch-panel",
+          model: "PP-02",
+          manufacturer: "TestCo",
+          modelNumber: "PP-4U",
+          unitCost: 120,
+          auxiliaryData: [{ text: "{{deviceType}}", position: "header" }],
+        },
+      },
     ],
     [
       {
@@ -751,6 +783,21 @@ const techTable: RoomSpec = {
           manufacturer: "TestCo",
           modelNumber: "LT-16",
           powerDrawW: 90,
+          auxiliaryData: [{ text: "{{deviceType}}", position: "header" }],
+        },
+      },
+      {
+        // Same-signal partner for Designer Laptop's HDMI Out, one ROW_GAP below
+        // it in the same column — well inside one 100%-zoom viewport, unwired, so
+        // a connection drag between the two needs no substitute devices (#378).
+        id: "device-25",
+        label: "Preview Monitor (HDMI)",
+        ports: [pvMonHdmiIn],
+        data: {
+          deviceType: "monitor",
+          model: "Preview Monitor (HDMI)",
+          manufacturer: "TestCo",
+          modelNumber: "PM-HD",
           auxiliaryData: [{ text: "{{deviceType}}", position: "header" }],
         },
       },

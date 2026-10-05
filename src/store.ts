@@ -1227,6 +1227,10 @@ function runAsSingleUndoStep(ids: string[], apply: (id: string) => void) {
     bundles: state.bundles,
   });
   const previousPending = pendingUndoSnapshot;
+  // Restore, don't reset: a batch nested inside another suppressed batch must hand the outer
+  // batch its own suppression and deferred save back (#370).
+  const previousSuppressed = suppressedUndoPushes;
+  const previousDeferredSave = deferredSave;
   const suppressed = { count: 0 };
   const save = { pending: false };
   suppressedUndoPushes = suppressed;
@@ -1234,8 +1238,8 @@ function runAsSingleUndoStep(ids: string[], apply: (id: string) => void) {
   try {
     for (const id of ids) apply(id);
   } finally {
-    suppressedUndoPushes = null;
-    deferredSave = null;
+    suppressedUndoPushes = previousSuppressed;
+    deferredSave = previousDeferredSave;
   }
   // Every action bailed without changing anything — no undo entry, nothing to save.
   if (suppressed.count === 0) return;
@@ -4626,7 +4630,23 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         h: n.measured?.height ?? (n.height as number) ?? (n.style?.height as number) ?? estimateDeviceHeight(n),
       };
     };
-    const obstacles = state.nodes.filter((n) => n.type === "device").map(deviceBox);
+    // Stub tags and text stubs are obstacles too (#371): they sit near the cable path,
+    // so the midpoint is exactly where one tends to be.
+    // They are tag-sized, not device-sized, until React Flow measures them.
+    const tagBox = (n: SchematicNode) => {
+      const abs = absPos(n);
+      return {
+        x: abs.x - parentOrigin.x,
+        y: abs.y - parentOrigin.y,
+        w: n.measured?.width ?? STUB_W_EST,
+        h: n.measured?.height ?? STUB_H_EST,
+      };
+    };
+    const obstacles = state.nodes.flatMap((n) =>
+      n.type === "device" ? [deviceBox(n)]
+      : n.type === "stub-label" || n.type === "text-stub" ? [tagBox(n)]
+      : [],
+    );
 
     // Staying inside the parent room is more than cosmetic: room membership is
     // geometric (findBestEnclosingRoom), so an adapter parked outside the room it

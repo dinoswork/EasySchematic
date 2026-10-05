@@ -1049,12 +1049,12 @@
       },
       "style": {
         "width": 736,
-        "height": 768
+        "height": 992
       },
       "zIndex": -1,
       "measured": {
         "width": 736,
-        "height": 768
+        "height": 992
       }
     },
     {
@@ -1184,6 +1184,81 @@
       }
     },
     {
+      "id": "device-26",
+      "type": "device",
+      "position": {
+        "x": 32,
+        "y": 608
+      },
+      "parentId": "room-3",
+      "measured": {
+        "width": 176,
+        "height": 128
+      },
+      "data": {
+        "label": "PP-02",
+        "ports": [
+          {
+            "id": "pp2-1",
+            "label": "1 — Cat6",
+            "signalType": "custom",
+            "inheritsSignal": true,
+            "direction": "passthrough",
+            "connectorType": "rj45",
+            "rearConnectorType": "rj45",
+            "frontConnectorType": "rj45",
+            "rearGender": "female",
+            "frontGender": "female"
+          },
+          {
+            "id": "pp2-2",
+            "label": "2 — BNC",
+            "signalType": "custom",
+            "inheritsSignal": true,
+            "direction": "passthrough",
+            "connectorType": "bnc",
+            "rearConnectorType": "bnc",
+            "frontConnectorType": "bnc",
+            "rearGender": "female",
+            "frontGender": "female"
+          },
+          {
+            "id": "pp2-3",
+            "label": "3 — XLR-3",
+            "signalType": "custom",
+            "inheritsSignal": true,
+            "direction": "passthrough",
+            "connectorType": "xlr-3",
+            "rearConnectorType": "xlr-3",
+            "frontConnectorType": "xlr-3",
+            "rearGender": "female",
+            "frontGender": "male"
+          },
+          {
+            "id": "pp2-4",
+            "label": "4 — LC Fiber",
+            "signalType": "custom",
+            "inheritsSignal": true,
+            "direction": "passthrough",
+            "connectorType": "lc",
+            "rearConnectorType": "lc",
+            "frontConnectorType": "lc"
+          }
+        ],
+        "deviceType": "patch-panel",
+        "model": "PP-02",
+        "manufacturer": "TestCo",
+        "modelNumber": "PP-4U",
+        "unitCost": 120,
+        "auxiliaryData": [
+          {
+            "text": "{{deviceType}}",
+            "position": "header"
+          }
+        ]
+      }
+    },
+    {
       "id": "device-17",
       "type": "device",
       "position": {
@@ -1296,11 +1371,46 @@
       }
     },
     {
-      "id": "device-21",
+      "id": "device-25",
       "type": "device",
       "position": {
         "x": 528,
         "y": 592
+      },
+      "parentId": "room-3",
+      "measured": {
+        "width": 176,
+        "height": 64
+      },
+      "data": {
+        "label": "Preview Monitor (HDMI)",
+        "ports": [
+          {
+            "id": "pvmon-hdmi-in",
+            "label": "HDMI In",
+            "signalType": "hdmi",
+            "direction": "input",
+            "connectorType": "hdmi"
+          }
+        ],
+        "deviceType": "monitor",
+        "model": "Preview Monitor (HDMI)",
+        "manufacturer": "TestCo",
+        "modelNumber": "PM-HD",
+        "auxiliaryData": [
+          {
+            "text": "{{deviceType}}",
+            "position": "header"
+          }
+        ]
+      }
+    },
+    {
+      "id": "device-21",
+      "type": "device",
+      "position": {
+        "x": 528,
+        "y": 816
       },
       "parentId": "room-3",
       "measured": {
@@ -1411,7 +1521,7 @@
       "type": "device",
       "position": {
         "x": 0,
-        "y": 960
+        "y": 1152
       },
       "measured": {
         "width": 176,
@@ -1475,7 +1585,7 @@
       "type": "device",
       "position": {
         "x": 496,
-        "y": 960
+        "y": 1152
       },
       "measured": {
         "width": 176,

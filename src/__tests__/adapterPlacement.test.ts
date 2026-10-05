@@ -28,6 +28,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { findFreeAdapterSlot, ADAPTER_GAP, DEVICE_W_EST, type PlacementBox } from "../adapterPlacement";
 import { GRID_SIZE } from "../gridConstants";
+import { STUB_W_EST, STUB_H_EST } from "../stubPlacement";
 import { DEVICE_TEMPLATES } from "../deviceLibrary";
 import type { DeviceData, Port, SchematicNode } from "../types";
 
@@ -452,6 +453,71 @@ describe("insertAdapterBetween placement (#363)", () => {
       .filter((n) => n.type === "device" && n.parentId === "room-2" && n.id !== adapter!.id)
       .map(boxOf);
     expectClearOfAll(adapter!.position, box, roommates);
+  });
+});
+
+describe("insertAdapterBetween placement avoids stub tags (#371)", () => {
+  beforeEach(() => {
+    useSchematicStore.setState({ nodes: [], edges: [], pendingIncompatibleConnection: null });
+  });
+
+  /** Core Switch (0,320) -> USB Hub (800,320): the adapter's ideal slot is (480, 352),
+   *  with nothing else near it — the "empty midpoint" geometry. */
+  function dragWith(tag: SchematicNode) {
+    useSchematicStore.setState({
+      nodes: [
+        deviceNode("n1", "Core Switch", [SWITCH_PORT], 0, 320),
+        deviceNode("n2", "USB Hub", [HUB_IN, HUB_OUT], 800, 320),
+        tag,
+      ],
+      edges: [],
+      pendingIncompatibleConnection: null,
+    });
+    useSchematicStore.getState().onConnect({
+      source: "n1", sourceHandle: "sw-p3-out", target: "n2", targetHandle: "hub-in",
+    });
+    return useSchematicStore.getState().nodes
+      .find((n) => (n.data as { label?: string }).label === USB_ETH_ADAPTER)!;
+  }
+
+  // Tags are unmeasured here, so the store has to fall back to the shared tag estimate.
+  const tagBox: PlacementBox = { x: 480, y: 352, w: STUB_W_EST, h: STUB_H_EST };
+  const adapterSize = { w: DEVICE_W_EST, h: 64 };
+
+  it("does not land on a stub tag sitting on the midpoint", () => {
+    const adapter = dragWith({
+      id: "tag1",
+      type: "stub-label",
+      position: { x: tagBox.x, y: tagBox.y },
+      data: { signalType: "usb", linkedConnectionId: "c1", side: "source" },
+    } as unknown as SchematicNode);
+    expect(adapter).toBeDefined();
+    expectClearOfAll(adapter.position, adapterSize, [tagBox]);
+  });
+
+  it("does not land on a text stub sitting on the midpoint", () => {
+    const adapter = dragWith({
+      id: "txt1",
+      type: "text-stub",
+      position: { x: tagBox.x, y: tagBox.y },
+      data: { text: "Client LAN", signalType: "usb", anchorNodeId: "n1", anchorPortId: "sw-p3", side: "r" },
+    } as unknown as SchematicNode);
+    expect(adapter).toBeDefined();
+    expectClearOfAll(adapter.position, adapterSize, [tagBox]);
+  });
+
+  it("uses a tag's measured size over the estimate", () => {
+    // The estimate box (200..280) clears the midpoint at x=480; only the measured
+    // 400-wide box (200..600) reaches it, so this fails if `measured` is ignored.
+    const wide: PlacementBox = { x: 200, y: 352, w: 400, h: 14 };
+    const adapter = dragWith({
+      id: "tag2",
+      type: "stub-label",
+      position: { x: wide.x, y: wide.y },
+      measured: { width: wide.w, height: wide.h },
+      data: { signalType: "usb", linkedConnectionId: "c2", side: "source" },
+    } as unknown as SchematicNode);
+    expectClearOfAll(adapter.position, adapterSize, [wide]);
   });
 });
 

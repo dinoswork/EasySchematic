@@ -80,6 +80,15 @@ the fixture, a test fails rather than a test pass quietly losing coverage.
   zero-match incompatible-connection dialog, since the library has no EU/UK
   power adapter template yet; the guard test pins that state and flags when a
   template appears).
+- **Connection-drag pair (#378).** `Designer Laptop` (HDMI Out) and `Preview
+  Monitor (HDMI)` (HDMI In) sit one `ROW_GAP` apart in the same `TECH TABLE`
+  column, both free, so a compatible same-signal drag, ghost-line or snap scenario
+  fits one 100%-zoom viewport. The HDMI inputs in `main Hall` are free too but
+  1900+ flow units from the laptop, which is why this pair exists.
+- **Unwired patch panel (#378).** `PP-02` (four passthrough ports, no
+  connections) in `TECH TABLE`. `setPanelOffCanvas` refuses a wired panel, and
+  `PP-01` carries four legs, so this is the one to virtualize into the
+  off-canvas patch-panel view or drag fresh legs onto.
 - **Patch panel.** `PP-01` carries eight passthrough ports spanning Cat6,
   etherCON, BNC, XLR-3, LC fiber, two half-normalled TRS and a
   terminal-block/Phoenix pair, with front/rear connector and gender mismatches.
