@@ -157,7 +157,7 @@ function resolvePort(node: SchematicNode | undefined, handleId: string | null | 
 }
 
 /** A raw or reassembled connection with real device endpoints on both ends. */
-export interface LogicalEdge {
+interface LogicalEdge {
   source: string;
   target: string;
   sourceHandle?: string | null;

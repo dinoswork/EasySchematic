@@ -1243,6 +1243,7 @@ export default function DeviceEditor() {
             ports={inputs}
             onAdd={() => addPort("input")}
             onBulkAdd={bulkAddPorts}
+            bulkRoom={Math.max(0, MAX_PORTS - ports.length)}
             onRemove={removePort}
             onDuplicate={duplicatePort}
             onUpdate={updatePort}
@@ -1262,6 +1263,7 @@ export default function DeviceEditor() {
             ports={outputs}
             onAdd={() => addPort("output")}
             onBulkAdd={bulkAddPorts}
+            bulkRoom={Math.max(0, MAX_PORTS - ports.length)}
             onRemove={removePort}
             onDuplicate={duplicatePort}
             onUpdate={updatePort}
@@ -1282,6 +1284,7 @@ export default function DeviceEditor() {
               ports={bidir}
               onAdd={() => addPort("bidirectional")}
               onBulkAdd={bulkAddPorts}
+              bulkRoom={Math.max(0, MAX_PORTS - ports.length)}
               onRemove={removePort}
               onDuplicate={duplicatePort}
               onUpdate={updatePort}
@@ -1303,6 +1306,7 @@ export default function DeviceEditor() {
               ports={passthroughPorts}
               onAdd={() => addPort("passthrough")}
               onBulkAdd={bulkAddPorts}
+              bulkRoom={Math.max(0, MAX_PORTS - ports.length)}
               onRemove={removePort}
               onDuplicate={duplicatePort}
               onUpdate={updatePort}
@@ -1963,10 +1967,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function BulkAddForm({
   direction,
   onBulkAdd,
+  bulkRoom,
   onClose,
 }: {
   direction: PortDirection;
   onBulkAdd: (spec: BulkPortSpec) => void;
+  bulkRoom: number;
   onClose: () => void;
 }) {
   const [prefix, setPrefix] = useState("Input");
@@ -1979,7 +1985,7 @@ function BulkAddForm({
 
   const handleSubmit = () => {
     const count = end - start + 1;
-    if (count < 1 || !prefix.trim()) return;
+    if (count < 1 || !prefix.trim() || bulkRoom < 1) return;
     onBulkAdd({ direction, prefix: prefix.trim(), start, count, signalType, connectorType, section: section.trim() || undefined, spaceBeforeNumber });
     onClose();
   };
@@ -2086,6 +2092,13 @@ function BulkAddForm({
           Prefix ends in a digit — consider the space option
         </div>
       )}
+      {bulkRoom < 1 ? (
+        <div className="text-[10px] text-amber-500">A device can have at most {MAX_PORTS} ports.</div>
+      ) : end - start + 1 > bulkRoom ? (
+        <div className="text-[10px] text-amber-500">
+          Only {bulkRoom} more port{bulkRoom === 1 ? "" : "s"} fit (max {MAX_PORTS}); the count will be capped.
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2308,6 +2321,7 @@ function PortSection({
   ports,
   onAdd,
   onBulkAdd,
+  bulkRoom,
   onRemove,
   onDuplicate,
   onUpdate,
@@ -2325,6 +2339,7 @@ function PortSection({
   ports: PortDraft[];
   onAdd: () => void;
   onBulkAdd: (spec: BulkPortSpec) => void;
+  bulkRoom: number;
   onRemove: (id: string) => void;
   onDuplicate: (id: string) => void;
   onUpdate: (id: string, updates: Partial<PortDraft>) => void;
@@ -2407,6 +2422,7 @@ function PortSection({
         <BulkAddForm
           direction={direction}
           onBulkAdd={onBulkAdd}
+          bulkRoom={bulkRoom}
           onClose={() => setShowBulkAdd(false)}
         />
       )}
