@@ -24,6 +24,7 @@ import {
   truncateToWidth,
 } from "../dxfExport/units";
 import { CANONICAL_LAYERS, LTYPE_DEFS, buildLayerDefs, signalLayerName } from "../dxfExport/layers";
+import { createDefaultLayout } from "../titleBlockLayout";
 import { DEFAULT_SIGNAL_COLORS } from "../signalColors";
 import { wrapDeviceLabelLines } from "../displayName";
 import { emitRoundedWaypointPath } from "../dxfExport/geometry";
@@ -1799,5 +1800,42 @@ describe("buildDxf — stub labels read past a hidden adapter (#348)", () => {
   it("still names the adapter while the adapter is drawn", () => {
     const texts = stubLabelTexts([]);
     expect(texts).toContain(escapeForMText("BNC (F) to BNC (M) Barrel [BNC (F)]"));
+  });
+});
+
+describe("buildDxf — Print View title block toggle (#388)", () => {
+  const nodes = [
+    {
+      id: "dev-a",
+      type: "device",
+      position: { x: 0, y: 0 },
+      measured: { width: 144, height: 80 },
+      data: { label: "Device A", ports: [] },
+    },
+  ] as unknown as SchematicNode[];
+
+  afterEach(resetExportStore);
+
+  function titleBlockEntities(enabled: boolean) {
+    useSchematicStore.setState({
+      nodes, edges: [], routedEdges: {},
+      colorKeyEnabled: false, printView: false,
+      titleBlock: { title: "Main Hall" } as never,
+      titleBlockLayout: createDefaultLayout(),
+      printTitleBlockEnabled: enabled,
+    });
+    const dxf = buildDxf(instanceFor(nodes));
+    expect(dxf).not.toBeNull();
+    return (parse(dxf!).entities as { layer: string }[]).filter(
+      (e) => e.layer === CANONICAL_LAYERS.TITLE_BLOCK,
+    );
+  }
+
+  it("draws the title block when the toggle is on", () => {
+    expect(titleBlockEntities(true).length).toBeGreaterThan(0);
+  });
+
+  it("omits the title block when the toggle is off", () => {
+    expect(titleBlockEntities(false).length).toBe(0);
   });
 });

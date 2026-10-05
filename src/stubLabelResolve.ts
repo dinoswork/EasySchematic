@@ -11,7 +11,7 @@
 import { resolvePortLabel } from "./packList";
 import { hopHiddenAdapters } from "./adapterVisibility";
 import { computePageGrid } from "./printPageGrid";
-import { getPaperSize, type Orientation } from "./printConfig";
+import { getPaperSize, printTitleBlockHeightIn, type Orientation } from "./printConfig";
 import type { StubLabelParts } from "./stubLabelText";
 import { DEFAULT_STUB_LABEL_MODE } from "./types";
 import type {
@@ -223,6 +223,8 @@ export interface PrintPageLookupState {
   printOriginOffsetX: number;
   printOriginOffsetY: number;
   titleBlockLayout?: TitleBlockLayout | null;
+  /** Absent = shown. A hidden title block lays pages out with no band (#388). */
+  printTitleBlockEnabled?: boolean;
   nodes: SchematicNode[];
 }
 
@@ -237,7 +239,7 @@ export function buildPrintPageLookup(
   const paperSize = getPaperSize(s.printPaperId, s.printCustomWidthIn, s.printCustomHeightIn);
   const pages = computePageGrid(
     paperSize, s.printOrientation, s.printScale, s.nodes,
-    s.titleBlockLayout?.heightIn ?? 1, s.printOriginOffsetX, s.printOriginOffsetY,
+    printTitleBlockHeightIn(s.titleBlockLayout, s.printTitleBlockEnabled ?? true), s.printOriginOffsetX, s.printOriginOffsetY,
   );
   if (pages.length <= 1) return undefined;
   return (x, y) => {

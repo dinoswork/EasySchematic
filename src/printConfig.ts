@@ -11,6 +11,19 @@ export type Orientation = "landscape" | "portrait";
 export const PAGE_MARGIN_IN = 0.4;
 export const TITLE_BLOCK_HEIGHT_IN = 1.0;
 
+/**
+ * Height the print view lays each page out with for the title block: the layout's
+ * height while it is shown, 0 once the per-file toggle hides it (#388). Every
+ * surface that derives the page grid or the title block band goes through this,
+ * so they agree on where the drawing area ends.
+ */
+export function printTitleBlockHeightIn(
+  layout: { heightIn: number } | null | undefined,
+  show: boolean,
+): number {
+  return show ? (layout?.heightIn ?? TITLE_BLOCK_HEIGHT_IN) : 0;
+}
+
 export const PAPER_SIZES: PaperSize[] = [
   // Standard
   { id: "letter", label: "Letter", widthIn: 8.5, heightIn: 11, category: "Standard" },

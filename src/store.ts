@@ -614,6 +614,8 @@ interface SchematicState {
   printCustomHeightIn: number;
   printOriginOffsetX: number;
   printOriginOffsetY: number;
+  /** Print view title block shown on pages and in the PDF; hiding it gives its band to the drawing (#388). */
+  printTitleBlockEnabled: boolean;
   // Color key / signal legend for print view
   colorKeyEnabled: boolean;
   colorKeyCorner: "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -636,6 +638,7 @@ interface SchematicState {
   setRoomDistance: (roomIdA: string, roomIdB: string, distance: number | undefined) => void;
   clearRoomDistance: (roomIdA: string, roomIdB: string) => void;
   setDistanceSettings: (partial: Partial<DistanceSettings>) => void;
+  setPrintTitleBlockEnabled: (v: boolean) => void;
   setColorKeyEnabled: (v: boolean) => void;
   setColorKeyCorner: (c: "top-left" | "top-right" | "bottom-left" | "bottom-right") => void;
   setColorKeyColumns: (n: number) => void;
@@ -2097,6 +2100,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   printCustomHeightIn: 36,
   printOriginOffsetX: 0,
   printOriginOffsetY: 0,
+  printTitleBlockEnabled: true,
   colorKeyEnabled: false,
   colorKeyCorner: "bottom-left" as "top-left" | "top-right" | "bottom-left" | "bottom-right",
   colorKeyColumns: 1,
@@ -4940,6 +4944,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
   setPrintCustomWidthIn: (w) => { set({ printCustomWidthIn: Math.max(1, w) }); get().saveToLocalStorage(); },
   setPrintCustomHeightIn: (h) => { set({ printCustomHeightIn: Math.max(1, h) }); get().saveToLocalStorage(); },
   setPrintOriginOffset: (x, y) => { set({ printOriginOffsetX: x, printOriginOffsetY: y }); get().saveToLocalStorage(); },
+  setPrintTitleBlockEnabled: (v) => { set({ printTitleBlockEnabled: v }); get().saveToLocalStorage(); },
   setColorKeyEnabled: (v) => { set({ colorKeyEnabled: v }); get().saveToLocalStorage(); },
   setColorKeyCorner: (c) => { set({ colorKeyCorner: c }); get().saveToLocalStorage(); },
   setColorKeyColumns: (n) => { set({ colorKeyColumns: Math.max(1, Math.min(4, n)) }); get().saveToLocalStorage(); },
@@ -6244,6 +6249,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       categoryOrder: state.categoryOrder ?? undefined,
       showOwnedGearPane: state.showOwnedGearPane || undefined,
       libraryActiveTab: state.libraryActiveTab !== "devices" ? state.libraryActiveTab : undefined,
+      printTitleBlockEnabled: state.printTitleBlockEnabled ? undefined : false,
       colorKeyEnabled: state.colorKeyEnabled || undefined,
       colorKeyCorner: state.colorKeyCorner !== "bottom-left" ? state.colorKeyCorner : undefined,
       colorKeyColumns: state.colorKeyColumns !== 1 ? state.colorKeyColumns : undefined,
@@ -6346,6 +6352,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
             categoryOrder: data.categoryOrder ?? null,
             showOwnedGearPane: data.showOwnedGearPane ?? false,
             libraryActiveTab: data.showOwnedGearPane ? (data.libraryActiveTab ?? "devices") : "devices",
+            printTitleBlockEnabled: data.printTitleBlockEnabled ?? true,
             colorKeyEnabled: data.colorKeyEnabled ?? false,
             colorKeyCorner: data.colorKeyCorner ?? "bottom-left",
             colorKeyColumns: data.colorKeyColumns ?? 1,
@@ -6447,6 +6454,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         categoryOrder: data.categoryOrder ?? null,
         showOwnedGearPane: data.showOwnedGearPane ?? false,
         libraryActiveTab: data.showOwnedGearPane ? (data.libraryActiveTab ?? "devices") : "devices",
+        printTitleBlockEnabled: data.printTitleBlockEnabled ?? true,
         colorKeyEnabled: data.colorKeyEnabled ?? false,
         colorKeyCorner: data.colorKeyCorner ?? "bottom-left",
         colorKeyColumns: data.colorKeyColumns ?? 1,
@@ -6546,6 +6554,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       categoryOrder: state.categoryOrder ?? undefined,
       showOwnedGearPane: state.showOwnedGearPane || undefined,
       libraryActiveTab: state.libraryActiveTab !== "devices" ? state.libraryActiveTab : undefined,
+      printTitleBlockEnabled: state.printTitleBlockEnabled ? undefined : false,
       colorKeyEnabled: state.colorKeyEnabled || undefined,
       colorKeyCorner: state.colorKeyCorner !== "bottom-left" ? state.colorKeyCorner : undefined,
       colorKeyColumns: state.colorKeyColumns !== 1 ? state.colorKeyColumns : undefined,
@@ -6650,6 +6659,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
       categoryOrder: data.categoryOrder ?? null,
       showOwnedGearPane: data.showOwnedGearPane ?? false,
       libraryActiveTab: data.showOwnedGearPane ? (data.libraryActiveTab ?? "devices") : "devices",
+      printTitleBlockEnabled: data.printTitleBlockEnabled ?? true,
       colorKeyEnabled: data.colorKeyEnabled ?? false,
       colorKeyCorner: data.colorKeyCorner ?? "bottom-left",
       colorKeyColumns: data.colorKeyColumns ?? 1,
@@ -6741,6 +6751,7 @@ export const useSchematicStore = create<SchematicState>((set, get) => ({
         fileHandle: null,
         titleBlock: { showName: "", venue: "", designer: "", engineer: "", date: "", drawingTitle: "", company: "", revision: "", logo: "", customFields: [] },
         titleBlockLayout: createDefaultLayout(),
+        printTitleBlockEnabled: true,
         hiddenSignalTypes: "",
         hiddenPinSignalTypes: "",
         hideUnconnectedPorts: false,

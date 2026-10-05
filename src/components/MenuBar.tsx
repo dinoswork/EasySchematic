@@ -529,6 +529,8 @@ export default function MenuBar() {
       nodes: state.nodes,
       schematicName: state.schematicName,
       titleBlock: state.titleBlock,
+      // The paper picked in the print view, not a hardcoded Letter (#379).
+      paper: getPaperSize(state.printPaperId, state.printCustomWidthIn, state.printCustomHeightIn),
       schematicDefaults: { useShortNames: state.useShortNames, wrapDeviceLabels: state.wrapDeviceLabels },
     });
   };

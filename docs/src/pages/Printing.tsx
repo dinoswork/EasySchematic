@@ -28,6 +28,11 @@ export default function PrintingPage() {
         </li>
         <li><strong>Orientation</strong> — Landscape or Portrait</li>
         <li><strong>Scale</strong> — 0.25x to 2.0x, controlling how much of the canvas fits on each page</li>
+        <li>
+          <strong>Title Block</strong> — show or hide the title block on every page. Hiding it gives its
+          height back to the drawing, so each page holds more of the schematic and the page count can drop.
+          The setting is saved with the file, next to the <strong>Signal Key</strong> toggle.
+        </li>
       </ul>
 
       <h2>Show Info panel</h2>
@@ -46,7 +51,8 @@ export default function PrintingPage() {
 
       <h2>Title Block</h2>
       <p>
-        The title block appears at the bottom of each printed page. It has two configuration tabs:
+        The title block appears at the bottom of each printed page unless you switch it off with the
+        <strong> Title Block</strong> toggle in the Print View toolbar. It has two configuration tabs:
       </p>
 
       <h3>Data tab</h3>
@@ -67,7 +73,12 @@ export default function PrintingPage() {
       <h2>PDF export</h2>
       <p>
         Open the <strong>Export</strong> menu in the menu bar, then choose <strong>Export PDF</strong> to generate a multi-page PDF
-        document matching your Print View settings. Each page includes the title block.
+        document matching your Print View settings. Each page includes the title block, unless it is
+        hidden in Print View.
+      </p>
+      <p>
+        <strong>Export Rack PDF</strong> prints one landscape sheet per rack on the paper size chosen in
+        Print View.
       </p>
     </>
   );

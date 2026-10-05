@@ -897,6 +897,8 @@ export interface SchematicFile {
   showOwnedGearPane?: boolean;
   /** Active tab in the left library panel */
   libraryActiveTab?: "devices" | "owned";
+  /** Print view title block. Absent = shown; written only as `false` (#388). */
+  printTitleBlockEnabled?: boolean;
   /** Color key / signal legend for print view (#70) */
   colorKeyEnabled?: boolean;
   colorKeyCorner?: "top-left" | "top-right" | "bottom-left" | "bottom-right";

@@ -10,7 +10,7 @@ import type {
   TitleBlock,
 } from "./types";
 import { RACK_ACCESSORY_LABELS } from "./types";
-import { getPageDimensions, type PaperSize } from "./reportLayout";
+import { getPaperSize, type PaperSize } from "./printConfig";
 import {
   inferRackHeightU,
   getRackDepthConflicts,
@@ -104,6 +104,7 @@ export function contrastingTextRgb(
 // ─── Title bar ───
 
 const PAGE_MARGIN_MM = 12;
+const MM_PER_IN = 25.4;
 const TITLE_BAR_H_MM = 14;
 
 function drawTitleBar(
@@ -644,7 +645,10 @@ export interface RackPdfOptions {
   nodes: SchematicNode[];
   schematicName: string;
   titleBlock?: TitleBlock;
-  paperSize?: PaperSize;
+  /** Paper to print on, as the print view's picker resolves it. Defaults to Letter.
+   *  The sheet is always laid out landscape: front and rear elevations sit side by
+   *  side over the side view (#379). */
+  paper?: PaperSize;
   /** When set, restrict the export to these page IDs (otherwise all rack pages) */
   pageIds?: string[];
   /** Schematic-wide short-name + wrap defaults; per-device fields override. */
@@ -652,9 +656,10 @@ export interface RackPdfOptions {
 }
 
 export async function exportRackPdf(opts: RackPdfOptions): Promise<void> {
-  const paper: PaperSize = opts.paperSize ?? "letter";
-  const { widthMm, heightMm } = getPageDimensions(paper, "landscape");
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: paper });
+  const paper = opts.paper ?? getPaperSize("letter");
+  const widthMm = Math.max(paper.widthIn, paper.heightIn) * MM_PER_IN;
+  const heightMm = Math.min(paper.widthIn, paper.heightIn) * MM_PER_IN;
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: [widthMm, heightMm] });
   await loadInterFont(doc);
 
   const deviceDataMap = new Map<string, DeviceData>();

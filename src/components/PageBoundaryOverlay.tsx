@@ -2,7 +2,7 @@ import { memo, useMemo, useCallback, useRef } from "react";
 import { useViewport, useReactFlow } from "@xyflow/react";
 import { useSchematicStore } from "../store";
 import { computePageGrid, type PageRect } from "../printPageGrid";
-import { PAGE_MARGIN_IN, getPaperSize } from "../printConfig";
+import { PAGE_MARGIN_IN, getPaperSize, printTitleBlockHeightIn } from "../printConfig";
 import type { TitleBlock, TitleBlockLayout } from "../types";
 import { computeCellRects, normalizeSizes, getFieldValue, getFieldLabel } from "../titleBlockLayout";
 import { transformLabel } from "../labelCaseUtils";
@@ -349,7 +349,14 @@ function PageBoundaryOverlay() {
   const printCustomWidthIn = useSchematicStore((s) => s.printCustomWidthIn);
   const printCustomHeightIn = useSchematicStore((s) => s.printCustomHeightIn);
   const titleBlock = useSchematicStore((s) => s.titleBlock);
-  const titleBlockLayout = useSchematicStore((s) => s.titleBlockLayout);
+  const storedTitleBlockLayout = useSchematicStore((s) => s.titleBlockLayout);
+  const printTitleBlockEnabled = useSchematicStore((s) => s.printTitleBlockEnabled);
+  // A hidden title block is a zero-height one: no band to draw, no band for pills
+  // to dodge, and its height goes back to each page's drawing area (#388).
+  const titleBlockLayout = useMemo(() => {
+    const heightIn = printTitleBlockHeightIn(storedTitleBlockLayout, printTitleBlockEnabled);
+    return heightIn === storedTitleBlockLayout.heightIn ? storedTitleBlockLayout : { ...storedTitleBlockLayout, heightIn };
+  }, [storedTitleBlockLayout, printTitleBlockEnabled]);
   const routedEdges = useSchematicStore((s) => s.routedEdges);
   const storeNodes = useSchematicStore((s) => s.nodes);
   const storeEdges = useSchematicStore((s) => s.edges);

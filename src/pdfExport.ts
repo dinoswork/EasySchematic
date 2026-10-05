@@ -8,6 +8,7 @@ import {
   type PaperSize,
   type Orientation,
   PAGE_MARGIN_IN,
+  printTitleBlockHeightIn,
 } from "./printConfig";
 import { computePageGrid, type PageRect } from "./printPageGrid";
 import type { TitleBlock, TitleBlockLayout, SchematicNode, ConnectionEdge } from "./types";
@@ -678,12 +679,19 @@ export async function exportPdf(
   orientation: Orientation,
   scale: number,
   titleBlock: TitleBlock,
-  layout: TitleBlockLayout,
+  storedLayout: TitleBlockLayout,
 ): Promise<void> {
   const nodes = rfInstance.getNodes();
   if (nodes.length === 0) return;
 
-  const { printOriginOffsetX, printOriginOffsetY } = useSchematicStore.getState();
+  const { printOriginOffsetX, printOriginOffsetY, printTitleBlockEnabled } = useSchematicStore.getState();
+  // A hidden title block is a zero-height one: drawTitleBlock finds no band and
+  // draws nothing, pills have nothing to dodge, and the page grid gives its height
+  // back to the drawing (#388).
+  const layout: TitleBlockLayout = {
+    ...storedLayout,
+    heightIn: printTitleBlockHeightIn(storedLayout, printTitleBlockEnabled),
+  };
   const pages = computePageGrid(paperSize, orientation, scale, nodes, layout.heightIn, printOriginOffsetX, printOriginOffsetY);
 
   if (pages.length === 0) return;

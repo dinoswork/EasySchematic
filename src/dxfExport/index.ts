@@ -170,7 +170,8 @@ export function buildDxf(rfInstance: ReactFlowInstance): string | null {
   }
 
   // ─── Title block (if configured) ───────────────────────────────────
-  if (state.titleBlock && state.titleBlockLayout) {
+  // The Print View "Title Block" toggle (#388) hides it here too, like the page numbers.
+  if (state.printTitleBlockEnabled !== false && state.titleBlock && state.titleBlockLayout) {
     const hasContent = Object.values(state.titleBlock).some(
       (v) => typeof v === "string" && v.trim().length > 0,
     );

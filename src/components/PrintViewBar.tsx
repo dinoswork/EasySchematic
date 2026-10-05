@@ -1,7 +1,7 @@
 import { memo, useCallback, useState, useRef, useEffect, useMemo } from "react";
 import { useReactFlow } from "@xyflow/react";
 import { useSchematicStore } from "../store";
-import { PAPER_SIZES, getPaperSize } from "../printConfig";
+import { PAPER_SIZES, getPaperSize, printTitleBlockHeightIn } from "../printConfig";
 import { computePageGrid } from "../printPageGrid";
 import { exportPdf } from "../pdfExport";
 import { collectColorKeyEntries } from "../colorKeyLayout";
@@ -16,6 +16,8 @@ function PrintViewBar() {
   const printCustomHeightIn = useSchematicStore((s) => s.printCustomHeightIn);
   const titleBlock = useSchematicStore((s) => s.titleBlock);
   const titleBlockLayout = useSchematicStore((s) => s.titleBlockLayout);
+  const printTitleBlockEnabled = useSchematicStore((s) => s.printTitleBlockEnabled);
+  const setPrintTitleBlockEnabled = useSchematicStore((s) => s.setPrintTitleBlockEnabled);
   // Subscribe to node positions so page count updates when nodes move
   useSchematicStore((s) =>
     s.nodes.map((n) => `${n.id}:${Math.round(n.position.x)},${Math.round(n.position.y)},${n.measured?.width ?? 0},${n.measured?.height ?? 0}`).join("|"),
@@ -69,7 +71,7 @@ function PrintViewBar() {
 
   const paperSize = getPaperSize(printPaperId, printCustomWidthIn, printCustomHeightIn);
   const nodes = rfInstance.getNodes();
-  const pages = computePageGrid(paperSize, printOrientation, printScale, nodes, titleBlockLayout.heightIn, printOriginOffsetX, printOriginOffsetY);
+  const pages = computePageGrid(paperSize, printOrientation, printScale, nodes, printTitleBlockHeightIn(titleBlockLayout, printTitleBlockEnabled), printOriginOffsetX, printOriginOffsetY);
 
   const handleExportPdf = useCallback(async () => {
     await exportPdf(rfInstance, paperSize, printOrientation, printScale, titleBlock, titleBlockLayout);
@@ -206,6 +208,20 @@ function PrintViewBar() {
       <span className="text-xs text-gray-500">
         {pages.length} page{pages.length !== 1 ? "s" : ""}
       </span>
+
+      {/* Title block — per file; hiding it gives its band back to the drawing (#388). */}
+      <button
+        className={`px-2 py-0.5 rounded border text-xs cursor-pointer ${
+          printTitleBlockEnabled
+            ? "bg-blue-600 text-white border-blue-600"
+            : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+        }`}
+        onClick={() => setPrintTitleBlockEnabled(!printTitleBlockEnabled)}
+        title="Toggle the title block"
+        aria-pressed={printTitleBlockEnabled}
+      >
+        Title Block
+      </button>
 
       {/* Signal Key — the legend renders as "SIGNAL KEY" on every surface, so the
           toggle says the same (#358). The colorKey* state names are unchanged. */}

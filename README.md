@@ -114,7 +114,7 @@ holes, occupancy stripes, and shelf occupants at full fidelity.
 ### Files & exports
 
 - **Print** — Standard, ISO A0–A4, ANSI, Architectural, or custom paper, with
-  orientation, scale, and a configurable title block
+  orientation, scale, and an optional, configurable title block
 - **DXF** for AutoCAD and Vectorworks, with organized layers; plus **PDF**,
   **PNG** (4x), and **SVG**
 - **JSON** import/export with schema versioning and migrations
