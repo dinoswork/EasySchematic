@@ -1,6 +1,7 @@
 import { type ReactFlowInstance, getViewportForBounds } from "@xyflow/react";
 import { toBlob, toSvg } from "html-to-image";
 import { freezeSvgColors } from "./freezeSvgColors";
+import { describeExportError, scrubXmlIllegalDom } from "./exportCapturePrep";
 import { useSchematicStore } from "./store";
 
 const EXPORT_PADDING = 40;
@@ -93,6 +94,9 @@ export async function exportImage(
   // Freeze var(--color-…) strokes to concrete colors so Chromium's html-to-image
   // clone keeps the connection lines (#173).
   const restoreColors = freezeSvgColors(viewportEl);
+  // XML-illegal characters in labels make the serialized SVG ill-formed; the
+  // capture then rejects with a bare Event (see exportCapturePrep.ts).
+  const restoreText = scrubXmlIllegalDom(viewportEl);
 
   // Download from a Blob, never a base64 data URL: the URL doubles the image in
   // memory as a giant string, and Chrome silently drops data-URL downloads past
@@ -119,7 +123,16 @@ export async function exportImage(
     } else {
       blob = await toBlob(viewportEl, captureOptions);
     }
+  } catch (err) {
+    // Callers fire-and-forget exportImage: without this, a failed capture is
+    // an unhandled rejection with no feedback at all.
+    console.error(`${format.toUpperCase()} export failed:`, err);
+    useSchematicStore
+      .getState()
+      .addToast(`${format.toUpperCase()} export failed — ${describeExportError(err)}`, "error");
+    return;
   } finally {
+    restoreText();
     restoreColors();
     CSSStyleDeclaration.prototype.getPropertyValue = origGetPropertyValue;
     document.documentElement.removeAttribute("data-export-capturing");

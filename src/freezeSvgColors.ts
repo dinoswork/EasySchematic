@@ -29,7 +29,12 @@ export function freezeSvgColors(root: HTMLElement): () => void {
     const inlineStroke = el.style.stroke;
     const inlineFill = el.style.fill;
     let touched = false;
-    if (inlineStroke.includes("var(")) {
+    // Connections with no inline stroke (hand-made or legacy files; the store
+    // only stamps style.stroke when it creates or retypes an edge) fall back to
+    // React Flow's stylesheet var() default, which the clone drops too. Freeze
+    // their computed stroke the same way.
+    const isUnstyledEdgePath = !inlineStroke && el.classList.contains("react-flow__edge-path");
+    if (inlineStroke.includes("var(") || isUnstyledEdgePath) {
       el.style.stroke = getComputedStyle(el).stroke;
       touched = true;
     }

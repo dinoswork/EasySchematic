@@ -3,6 +3,7 @@ import { jsPDF } from "jspdf";
 import { toBlob } from "html-to-image";
 import { freezeSvgColors } from "./freezeSvgColors";
 import { capExportPixelRatio } from "./exportUtils";
+import { describeExportError, scrubXmlIllegalDom } from "./exportCapturePrep";
 import {
   type PaperSize,
   type Orientation,
@@ -784,6 +785,7 @@ export async function exportPdf(
       // Freeze var(--color-…) strokes to concrete colors so Chromium's
       // html-to-image clone keeps the connection lines (#173).
       const restoreColors = freezeSvgColors(viewportEl);
+      const restoreText = scrubXmlIllegalDom(viewportEl);
       // Capture to a Blob, not a base64 data URL — the URL held each page's raster
       // twice over as a giant string on top of jsPDF's own copy (#383).
       let pageBlob: Blob | null;
@@ -801,6 +803,7 @@ export async function exportPdf(
           },
         });
       } finally {
+        restoreText();
         restoreColors();
         CSSStyleDeclaration.prototype.getPropertyValue = origGetPropertyValue;
       }
@@ -854,7 +857,7 @@ export async function exportPdf(
     console.error("PDF export failed:", err);
     useSchematicStore
       .getState()
-      .addToast(`PDF export failed — ${err instanceof Error ? err.message : "unexpected error"}`, "error");
+      .addToast(`PDF export failed — ${describeExportError(err)}`, "error");
   } finally {
     // Restore everything
     document.documentElement.removeAttribute("data-export-capturing");
